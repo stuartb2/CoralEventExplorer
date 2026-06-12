@@ -190,6 +190,8 @@ namespace ServiceBusExplorer.Controls
         private DateTime? deadletterFilterToDate;
         private string messagesBodySearch = string.Empty;
         private string deadletterBodySearch = string.Empty;
+        private HashSet<BrokeredMessage> messagesBodySearchMatches;
+        private HashSet<BrokeredMessage> deadletterBodySearchMatches;
         private SortableBindingList<BrokeredMessage> messageBindingList;
         private SortableBindingList<BrokeredMessage> deadletterBindingList;
         private SortableBindingList<MessageSession> sessionBindingList;
@@ -216,20 +218,62 @@ namespace ServiceBusExplorer.Controls
             CoralHelper.AttachPayloadTab(messagePropertiesSplitContainer, txtMessageText);
             CoralHelper.AttachPayloadTab(deadletterPropertiesSplitContainer, txtDeadletterText);
 
-            CoralHelper.AddBodySearchBox(grouperMessageList, text =>
+            CoralHelper.AddBodySearchBox(grouperMessageList, async text =>
             {
-                messagesBodySearch = text;
-                if (messageBindingList != null)
+                try
                 {
+                    messagesBodySearch = text;
+                    if (messageBindingList == null)
+                    {
+                        return;
+                    }
+                    UseWaitCursor = true;
+                    try
+                    {
+                        messagesBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, messageBindingList.ToList(), text);
+                    }
+                    finally
+                    {
+                        UseWaitCursor = false;
+                    }
+                    if (messagesBodySearch != text)
+                    {
+                        return; // superseded by a newer search
+                    }
                     FilterMessages();
                 }
-            });
-            CoralHelper.AddBodySearchBox(grouperDeadletterList, text =>
-            {
-                deadletterBodySearch = text;
-                if (deadletterBindingList != null)
+                catch (Exception ex)
                 {
+                    HandleException(ex);
+                }
+            });
+            CoralHelper.AddBodySearchBox(grouperDeadletterList, async text =>
+            {
+                try
+                {
+                    deadletterBodySearch = text;
+                    if (deadletterBindingList == null)
+                    {
+                        return;
+                    }
+                    UseWaitCursor = true;
+                    try
+                    {
+                        deadletterBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, deadletterBindingList.ToList(), text);
+                    }
+                    finally
+                    {
+                        UseWaitCursor = false;
+                    }
+                    if (deadletterBodySearch != text)
+                    {
+                        return; // superseded by a newer search
+                    }
                     FilterDeadletters();
+                }
+                catch (Exception ex)
+                {
+                    HandleException(ex);
                 }
             });
 
@@ -2586,9 +2630,9 @@ namespace ServiceBusExplorer.Controls
                     filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, messagesFilterFromDate, messagesFilterToDate)).ToList();
                 }
 
-                if (!string.IsNullOrWhiteSpace(messagesBodySearch))
+                if (!string.IsNullOrWhiteSpace(messagesBodySearch) && messagesBodySearchMatches != null)
                 {
-                    filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, messagesBodySearch)).ToList();
+                    filteredList = filteredList.Where(messagesBodySearchMatches.Contains).ToList();
                 }
 
                 var bindingList = new SortableBindingList<BrokeredMessage>(filteredList)
@@ -2637,9 +2681,9 @@ namespace ServiceBusExplorer.Controls
                     filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, deadletterFilterFromDate, deadletterFilterToDate)).ToList();
                 }
 
-                if (!string.IsNullOrWhiteSpace(deadletterBodySearch))
+                if (!string.IsNullOrWhiteSpace(deadletterBodySearch) && deadletterBodySearchMatches != null)
                 {
-                    filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, deadletterBodySearch)).ToList();
+                    filteredList = filteredList.Where(deadletterBodySearchMatches.Contains).ToList();
                 }
 
                 var bindingList = new SortableBindingList<BrokeredMessage>(filteredList)

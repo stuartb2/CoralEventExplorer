@@ -7,11 +7,14 @@ using ServiceBusExplorer.Forms;
 using ServiceBusExplorer.Helpers;
 using ServiceBusExplorer.Utilities.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 #endregion
@@ -94,6 +97,31 @@ namespace ServiceBusExplorer.UIHelpers
             return searchBox;
         }
 
+        // Decoding a message body (clone, read stream, gunzip, base64-decode the payload)
+        // is too slow to repeat for every message on every keystroke, so the searchable
+        // text is computed once per message and kept for the message's lifetime.
+        static readonly ConditionalWeakTable<BrokeredMessage, string> searchTextCache =
+            new ConditionalWeakTable<BrokeredMessage, string>();
+
+        static string BuildSearchText(ServiceBusHelper serviceBusHelper, BrokeredMessage message)
+        {
+            string body;
+            try
+            {
+                body = serviceBusHelper.GetMessageText(message, MainForm.SingletonMainForm.UseAscii, out _);
+            }
+            catch (Exception)
+            {
+                return string.Empty;
+            }
+            if (body == null)
+            {
+                return string.Empty;
+            }
+            var payload = TryExtractPayload(body);
+            return payload == null ? body : body + "\n" + payload;
+        }
+
         /// <summary>
         /// Returns true when the message body text, or its decoded data_base64 payload,
         /// contains the search text (case-insensitive).
@@ -104,25 +132,24 @@ namespace ServiceBusExplorer.UIHelpers
             {
                 return true;
             }
-            string body;
-            try
+            var text = searchTextCache.GetValue(message, m => BuildSearchText(serviceBusHelper, m));
+            return text.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// Computes the set of messages matching the search text on a background thread,
+        /// so the UI stays responsive while bodies are decoded. Returns null when the
+        /// search text is empty (meaning: no filtering).
+        /// </summary>
+        internal static Task<HashSet<BrokeredMessage>> ComputeMatchesAsync(
+            ServiceBusHelper serviceBusHelper, List<BrokeredMessage> messages, string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
             {
-                body = serviceBusHelper.GetMessageText(message, MainForm.SingletonMainForm.UseAscii, out _);
+                return Task.FromResult<HashSet<BrokeredMessage>>(null);
             }
-            catch (Exception)
-            {
-                return false;
-            }
-            if (body == null)
-            {
-                return false;
-            }
-            if (body.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return true;
-            }
-            var payload = TryExtractPayload(body);
-            return payload != null && payload.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+            return Task.Run(() => new HashSet<BrokeredMessage>(
+                messages.AsParallel().Where(m => MessageMatches(serviceBusHelper, m, searchText))));
         }
 
         /// <summary>
