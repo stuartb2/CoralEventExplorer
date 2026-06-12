@@ -250,6 +250,9 @@ namespace ServiceBusExplorer.Controls
         private DateTime? messagesFilterToDate = default!;
         private DateTime? deadletterFilterFromDate = default!;
         private DateTime? deadletterFilterToDate = default!;
+        private string messagesBodySearch = string.Empty;
+        private string deadletterBodySearch = string.Empty;
+        private string transferDeadletterBodySearch = string.Empty;
         private SortableBindingList<BrokeredMessage> messageBindingList = default!;
         private SortableBindingList<BrokeredMessage> deadletterBindingList = default!;
         private SortableBindingList<BrokeredMessage> transferDeadletterBindingList = default!;
@@ -317,6 +320,31 @@ namespace ServiceBusExplorer.Controls
             CoralHelper.AttachPayloadTab(messagePropertiesSplitContainer, txtMessageText);
             CoralHelper.AttachPayloadTab(deadletterPropertiesSplitContainer, txtDeadletterText);
             CoralHelper.AttachPayloadTab(transferDeadletterPropertiesSplitContainer, txtTransferDeadletterText);
+
+            CoralHelper.AddBodySearchBox(grouperMessageList, text =>
+            {
+                messagesBodySearch = text;
+                if (messageBindingList != null)
+                {
+                    FilterMessages();
+                }
+            });
+            CoralHelper.AddBodySearchBox(grouperDeadletterList, text =>
+            {
+                deadletterBodySearch = text;
+                if (deadletterBindingList != null)
+                {
+                    FilterDeadletters();
+                }
+            });
+            CoralHelper.AddBodySearchBox(grouperTransferDeadletterList, text =>
+            {
+                transferDeadletterBodySearch = text;
+                if (transferDeadletterBindingList != null)
+                {
+                    FilterTransferDeadletters();
+                }
+            });
 
             InitializeControls(initialCall: true);
         }
@@ -3638,7 +3666,7 @@ namespace ServiceBusExplorer.Controls
             var bindingList = new SortableBindingList<BrokeredMessage>();
             try
             {
-                if (messagesFilterFromDate == null && messagesFilterToDate == null && string.IsNullOrWhiteSpace(messagesFilterExpression))
+                if (messagesFilterFromDate == null && messagesFilterToDate == null && string.IsNullOrWhiteSpace(messagesFilterExpression) && string.IsNullOrWhiteSpace(messagesBodySearch))
                 {
                     bindingList = messageBindingList;
                     messagesBindingSource.DataSource = messageBindingList;
@@ -3670,6 +3698,11 @@ namespace ServiceBusExplorer.Controls
                     if (messagesFilterFromDate != null || messagesFilterToDate != null)
                     {
                         filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, messagesFilterFromDate, messagesFilterToDate)).ToList();
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(messagesBodySearch))
+                    {
+                        filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, messagesBodySearch)).ToList();
                     }
 
                     bindingList = new SortableBindingList<BrokeredMessage>(filteredList)
@@ -3707,7 +3740,7 @@ namespace ServiceBusExplorer.Controls
             var bindingList = new SortableBindingList<BrokeredMessage>();
             try
             {
-                if (deadletterFilterFromDate == null && deadletterFilterToDate == null && string.IsNullOrWhiteSpace(deadletterFilterExpression))
+                if (deadletterFilterFromDate == null && deadletterFilterToDate == null && string.IsNullOrWhiteSpace(deadletterFilterExpression) && string.IsNullOrWhiteSpace(deadletterBodySearch))
                 {
                     bindingList = deadletterBindingList;
                     deadletterBindingSource.DataSource = deadletterBindingList;
@@ -3741,6 +3774,11 @@ namespace ServiceBusExplorer.Controls
                         filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, deadletterFilterFromDate, deadletterFilterToDate)).ToList();
                     }
 
+                    if (!string.IsNullOrWhiteSpace(deadletterBodySearch))
+                    {
+                        filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, deadletterBodySearch)).ToList();
+                    }
+
                     bindingList = new SortableBindingList<BrokeredMessage>(filteredList)
                     {
                         AllowEdit = false,
@@ -3766,6 +3804,51 @@ namespace ServiceBusExplorer.Controls
                     {
                         deadletterMessage = default!;
                         deadletterDataGridView_RowEnter(this, new DataGridViewCellEventArgs(0, 0));
+                    }
+                }
+            }
+        }
+
+        private void FilterTransferDeadletters()
+        {
+            var bindingList = new SortableBindingList<BrokeredMessage>();
+            try
+            {
+                if (string.IsNullOrWhiteSpace(transferDeadletterBodySearch))
+                {
+                    bindingList = transferDeadletterBindingList;
+                    transferDeadletterBindingSource.DataSource = transferDeadletterBindingList;
+                    transferDeadletterDataGridView.DataSource = transferDeadletterBindingSource;
+                }
+                else
+                {
+                    var filteredList = transferDeadletterBindingList
+                        .Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, transferDeadletterBodySearch))
+                        .ToList();
+                    bindingList = new SortableBindingList<BrokeredMessage>(filteredList)
+                    {
+                        AllowEdit = false,
+                        AllowNew = false,
+                        AllowRemove = false
+                    };
+                    transferDeadletterBindingSource.DataSource = bindingList;
+                    transferDeadletterDataGridView.DataSource = transferDeadletterBindingSource;
+                }
+            }
+            finally
+            {
+                if (!bindingList.Any())
+                {
+                    txtTransferDeadletterText.Text = string.Empty;
+                    transferDeadletterCustomPropertyGrid.SelectedObject = null;
+                    transferDeadletterPropertyGrid.SelectedObject = null;
+                }
+                else
+                {
+                    if (transferDeadletterDataGridView.Rows.Count > 0)
+                    {
+                        transferDeadletterMessage = default!;
+                        transferDeadletterDataGridView_RowEnter(this, new DataGridViewCellEventArgs(0, 0));
                     }
                 }
             }

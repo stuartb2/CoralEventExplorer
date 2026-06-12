@@ -188,6 +188,8 @@ namespace ServiceBusExplorer.Controls
         private DateTime? messagesFilterToDate;
         private DateTime? deadletterFilterFromDate;
         private DateTime? deadletterFilterToDate;
+        private string messagesBodySearch = string.Empty;
+        private string deadletterBodySearch = string.Empty;
         private SortableBindingList<BrokeredMessage> messageBindingList;
         private SortableBindingList<BrokeredMessage> deadletterBindingList;
         private SortableBindingList<MessageSession> sessionBindingList;
@@ -213,6 +215,23 @@ namespace ServiceBusExplorer.Controls
 
             CoralHelper.AttachPayloadTab(messagePropertiesSplitContainer, txtMessageText);
             CoralHelper.AttachPayloadTab(deadletterPropertiesSplitContainer, txtDeadletterText);
+
+            CoralHelper.AddBodySearchBox(grouperMessageList, text =>
+            {
+                messagesBodySearch = text;
+                if (messageBindingList != null)
+                {
+                    FilterMessages();
+                }
+            });
+            CoralHelper.AddBodySearchBox(grouperDeadletterList, text =>
+            {
+                deadletterBodySearch = text;
+                if (deadletterBindingList != null)
+                {
+                    FilterDeadletters();
+                }
+            });
 
             InitializeControls();
         }
@@ -2534,7 +2553,7 @@ namespace ServiceBusExplorer.Controls
 
         private void FilterMessages()
         {
-            if (messagesFilterFromDate == null && messagesFilterToDate == null && string.IsNullOrWhiteSpace(messagesFilterExpression))
+            if (messagesFilterFromDate == null && messagesFilterToDate == null && string.IsNullOrWhiteSpace(messagesFilterExpression) && string.IsNullOrWhiteSpace(messagesBodySearch))
             {
                 messagesBindingSource.DataSource = messageBindingList;
                 messagesDataGridView.DataSource = messagesBindingSource;
@@ -2567,6 +2586,11 @@ namespace ServiceBusExplorer.Controls
                     filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, messagesFilterFromDate, messagesFilterToDate)).ToList();
                 }
 
+                if (!string.IsNullOrWhiteSpace(messagesBodySearch))
+                {
+                    filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, messagesBodySearch)).ToList();
+                }
+
                 var bindingList = new SortableBindingList<BrokeredMessage>(filteredList)
                 {
                     AllowEdit = false,
@@ -2581,7 +2605,7 @@ namespace ServiceBusExplorer.Controls
 
         private void FilterDeadletters()
         {
-            if (deadletterFilterFromDate == null && deadletterFilterToDate == null && string.IsNullOrWhiteSpace(deadletterFilterExpression))
+            if (deadletterFilterFromDate == null && deadletterFilterToDate == null && string.IsNullOrWhiteSpace(deadletterFilterExpression) && string.IsNullOrWhiteSpace(deadletterBodySearch))
             {
                 deadletterBindingSource.DataSource = deadletterBindingList;
                 deadletterDataGridView.DataSource = deadletterBindingSource;
@@ -2611,6 +2635,11 @@ namespace ServiceBusExplorer.Controls
                 if (deadletterFilterFromDate != null || deadletterFilterToDate != null)
                 {
                     filteredList = filteredList.Where(msg => IsWithinDateTimeRange(msg, deadletterFilterFromDate, deadletterFilterToDate)).ToList();
+                }
+
+                if (!string.IsNullOrWhiteSpace(deadletterBodySearch))
+                {
+                    filteredList = filteredList.Where(msg => CoralHelper.MessageMatches(serviceBusHelper, msg, deadletterBodySearch)).ToList();
                 }
 
                 var bindingList = new SortableBindingList<BrokeredMessage>(filteredList)

@@ -1,11 +1,17 @@
 #region Using Directives
 
 using FastColoredTextBoxNS;
+using Microsoft.ServiceBus.Messaging;
 using Newtonsoft.Json.Linq;
+using ServiceBusExplorer.Forms;
+using ServiceBusExplorer.Helpers;
 using ServiceBusExplorer.Utilities.Helpers;
 using System;
 using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 #endregion
@@ -22,6 +28,102 @@ namespace ServiceBusExplorer.UIHelpers
 
         const string PayloadFieldName = "data_base64";
         const string PayloadPanelTitle = "Coral Payload (data_base64)";
+
+        const int EM_SETCUEBANNER = 0x1501;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+
+        static void SetCueBanner(TextBox textBox, string hint)
+        {
+            if (textBox.IsHandleCreated)
+            {
+                SendMessage(textBox.Handle, EM_SETCUEBANNER, (IntPtr)1, hint);
+            }
+            else
+            {
+                textBox.HandleCreated += (s, e) => SendMessage(textBox.Handle, EM_SETCUEBANNER, (IntPtr)1, hint);
+            }
+        }
+
+        /// <summary>
+        /// Adds a search box to a message list grouper header. The callback fires with the
+        /// trimmed search text when the user presses Enter, and with an empty string when
+        /// the box is cleared.
+        /// </summary>
+        internal static TextBox AddBodySearchBox(Controls.Grouper listGrouper, Action<string> applySearch)
+        {
+            var searchBox = new TextBox
+            {
+                Name = "coralBodySearchBox_" + listGrouper.Name,
+                Location = new Point(152, 2),
+                Size = new Size(200, 20),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Font = new Font("Microsoft Sans Serif", 8.25F)
+            };
+            SetCueBanner(searchBox, "Search message text (Enter)");
+            var lastApplied = string.Empty;
+            void Apply()
+            {
+                var text = searchBox.Text.Trim();
+                if (text == lastApplied)
+                {
+                    return;
+                }
+                lastApplied = text;
+                applySearch(text);
+            }
+            searchBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    Apply();
+                }
+            };
+            searchBox.TextChanged += (s, e) =>
+            {
+                if (searchBox.Text.Length == 0)
+                {
+                    Apply();
+                }
+            };
+            listGrouper.Controls.Add(searchBox);
+            searchBox.BringToFront();
+            return searchBox;
+        }
+
+        /// <summary>
+        /// Returns true when the message body text, or its decoded data_base64 payload,
+        /// contains the search text (case-insensitive).
+        /// </summary>
+        internal static bool MessageMatches(ServiceBusHelper serviceBusHelper, BrokeredMessage message, string searchText)
+        {
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                return true;
+            }
+            string body;
+            try
+            {
+                body = serviceBusHelper.GetMessageText(message, MainForm.SingletonMainForm.UseAscii, out _);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            if (body == null)
+            {
+                return false;
+            }
+            if (body.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+            var payload = TryExtractPayload(body);
+            return payload != null && payload.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
 
         /// <summary>
         /// Selects the ZIP inspector in an inspector combo box, if available.
@@ -103,8 +205,67 @@ namespace ServiceBusExplorer.UIHelpers
 
             payloadGrouper.Controls.Add(payloadTextBox);
             var copyButton = CopyBodyButtonHelper.AddCopyBodyButton(payloadGrouper, payloadTextBox);
+
+            var findBox = new TextBox
+            {
+                Name = "coralPayloadFindBox_" + bodyTextBox.Name,
+                Size = new Size(168, 20),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Font = new Font("Microsoft Sans Serif", 8.25F)
+            };
+            SetCueBanner(findBox, "Find in payload (Enter = next)");
+            var highlightStyle = new TextStyle(Brushes.Black, Brushes.Gold, FontStyle.Regular);
+            void HighlightMatches()
+            {
+                payloadTextBox.Range.ClearStyle(highlightStyle);
+                var term = findBox.Text;
+                if (!string.IsNullOrEmpty(term))
+                {
+                    foreach (var range in payloadTextBox.Range.GetRanges(Regex.Escape(term), RegexOptions.IgnoreCase))
+                    {
+                        range.SetStyle(highlightStyle);
+                    }
+                }
+                payloadTextBox.Invalidate();
+            }
+            void GoToNextMatch()
+            {
+                var term = findBox.Text;
+                if (string.IsNullOrEmpty(term))
+                {
+                    return;
+                }
+                var matches = payloadTextBox.Range.GetRanges(Regex.Escape(term), RegexOptions.IgnoreCase).ToList();
+                if (matches.Count == 0)
+                {
+                    return;
+                }
+                var current = payloadTextBox.Selection.Start;
+                var next = matches.FirstOrDefault(m =>
+                    m.Start.iLine > current.iLine ||
+                    (m.Start.iLine == current.iLine && m.Start.iChar > current.iChar)) ?? matches[0];
+                payloadTextBox.Selection = next;
+                payloadTextBox.DoSelectionVisible();
+            }
+            findBox.TextChanged += (s, e) => HighlightMatches();
+            findBox.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    GoToNextMatch();
+                }
+            };
+            payloadTextBox.TextChanged += (s, e) => HighlightMatches();
+            payloadGrouper.Controls.Add(findBox);
+            findBox.BringToFront();
+
             payloadGrouper.CustomPaint += e =>
+            {
                 CopyBodyButtonHelper.LayoutTextBoxWithCopyButton(payloadGrouper, payloadTextBox, copyButton);
+                findBox.Location = new Point(copyButton.Location.X - findBox.Width - 8, 6);
+            };
 
             parent.Controls.Remove(propertiesContainer);
             propertiesContainer.Dock = DockStyle.Fill;
