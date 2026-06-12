@@ -27,11 +27,18 @@ namespace ServiceBusExplorer.UIHelpers
         static readonly Color StockPanelBlue = Color.FromArgb(215, 228, 242);
         static readonly Color StockBorderBlue = Color.FromArgb(153, 180, 209);
 
+        static bool rendererInstalled;
+
         internal static void Apply(Control root)
         {
             if (root == null)
             {
                 return;
+            }
+            if (!rendererInstalled)
+            {
+                ToolStripManager.Renderer = new CoralToolStripRenderer();
+                rendererInstalled = true;
             }
             ApplyTo(root);
             foreach (Control child in root.Controls)
@@ -58,6 +65,32 @@ namespace ServiceBusExplorer.UIHelpers
 
             switch (control)
             {
+                case Form form:
+                    form.BackColor = Surface;
+                    break;
+
+                case SplitContainer splitContainer:
+                    if (Is(splitContainer.BackColor, SystemColors.Control))
+                    {
+                        splitContainer.BackColor = Surface;
+                    }
+                    break;
+
+                case Controls.HeaderPanel headerPanel:
+                    headerPanel.HeaderColor1 = MidTeal;
+                    headerPanel.HeaderColor2 = DeepTeal;
+                    headerPanel.ForeColor = Color.White;
+                    break;
+
+                case ToolStrip strip: // includes MenuStrip and StatusStrip
+                    strip.BackColor = DeepTeal;
+                    strip.ForeColor = Color.White;
+                    foreach (ToolStripItem item in strip.Items)
+                    {
+                        RestyleToolStripItem(item);
+                    }
+                    break;
+
                 case Controls.Grouper grouper:
                     if (Is(grouper.BackgroundColor, StockPanelBlue))
                     {
@@ -105,6 +138,18 @@ namespace ServiceBusExplorer.UIHelpers
             }
         }
 
+        static void RestyleToolStripItem(ToolStripItem item)
+        {
+            item.ForeColor = Color.White;
+            if (item is ToolStripDropDownItem dropDownItem)
+            {
+                foreach (ToolStripItem child in dropDownItem.DropDownItems)
+                {
+                    RestyleToolStripItem(child);
+                }
+            }
+        }
+
         static void RestyleCell(DataGridViewCellStyle style)
         {
             if (Is(style.BackColor, StockPanelBlue))
@@ -117,6 +162,84 @@ namespace ServiceBusExplorer.UIHelpers
                 style.SelectionBackColor = MidTeal;
                 style.SelectionForeColor = Color.White;
             }
+        }
+
+        /// <summary>
+        /// Renders all menus, toolbars, status bars and context menus (via the global
+        /// ToolStripManager renderer) with white text on the teal chrome.
+        /// </summary>
+        class CoralToolStripRenderer : ToolStripProfessionalRenderer
+        {
+            public CoralToolStripRenderer() : base(new CoralColorTable())
+            {
+                RoundedEdges = false;
+            }
+
+            protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+            {
+                if (e.Item.Enabled)
+                {
+                    e.TextColor = Color.White;
+                }
+                base.OnRenderItemText(e);
+            }
+
+            protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
+            {
+                e.ArrowColor = Color.White;
+                base.OnRenderArrow(e);
+            }
+        }
+
+        /// <summary>
+        /// Colour table for menus, toolbars and the status bar: deep teal chrome with
+        /// mid-teal hover/selection so the white item text stays readable.
+        /// </summary>
+        class CoralColorTable : ProfessionalColorTable
+        {
+            public override Color MenuStripGradientBegin => DeepTeal;
+            public override Color MenuStripGradientEnd => DeepTeal;
+            public override Color ToolStripGradientBegin => DeepTeal;
+            public override Color ToolStripGradientMiddle => DeepTeal;
+            public override Color ToolStripGradientEnd => DeepTeal;
+            public override Color StatusStripGradientBegin => DeepTeal;
+            public override Color StatusStripGradientEnd => DeepTeal;
+            public override Color ToolStripDropDownBackground => DeepTeal;
+            public override Color ImageMarginGradientBegin => DeepTeal;
+            public override Color ImageMarginGradientMiddle => DeepTeal;
+            public override Color ImageMarginGradientEnd => DeepTeal;
+            public override Color MenuItemSelected => MidTeal;
+            public override Color MenuItemSelectedGradientBegin => MidTeal;
+            public override Color MenuItemSelectedGradientEnd => MidTeal;
+            public override Color MenuItemPressedGradientBegin => MidTeal;
+            public override Color MenuItemPressedGradientMiddle => MidTeal;
+            public override Color MenuItemPressedGradientEnd => MidTeal;
+            public override Color MenuItemBorder => Lime;
+            public override Color MenuBorder => MidTeal;
+            public override Color ButtonSelectedHighlight => MidTeal;
+            public override Color ButtonSelectedGradientBegin => MidTeal;
+            public override Color ButtonSelectedGradientMiddle => MidTeal;
+            public override Color ButtonSelectedGradientEnd => MidTeal;
+            public override Color ButtonSelectedBorder => Lime;
+            public override Color ButtonPressedHighlight => MidTeal;
+            public override Color ButtonPressedGradientBegin => MidTeal;
+            public override Color ButtonPressedGradientMiddle => MidTeal;
+            public override Color ButtonPressedGradientEnd => MidTeal;
+            public override Color ButtonCheckedHighlight => MidTeal;
+            public override Color ButtonCheckedGradientBegin => MidTeal;
+            public override Color ButtonCheckedGradientMiddle => MidTeal;
+            public override Color ButtonCheckedGradientEnd => MidTeal;
+            public override Color SeparatorDark => MidTeal;
+            public override Color SeparatorLight => MidTeal;
+            public override Color GripDark => MidTeal;
+            public override Color GripLight => DeepTeal;
+            public override Color OverflowButtonGradientBegin => DeepTeal;
+            public override Color OverflowButtonGradientMiddle => DeepTeal;
+            public override Color OverflowButtonGradientEnd => DeepTeal;
+            public override Color ToolStripBorder => DeepTeal;
+            public override Color CheckBackground => MidTeal;
+            public override Color CheckSelectedBackground => MidTeal;
+            public override Color CheckPressedBackground => MidTeal;
         }
     }
 }
