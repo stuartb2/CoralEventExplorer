@@ -189,6 +189,14 @@ namespace ServiceBusExplorer.Forms
             {
                 foreach (TreeNode rootNode in serviceBusTreeView.Nodes)
                 {
+                    // In the Coral simplified tree the entity list node is the root itself
+                    if (rootNode.Name == QueueEntities)
+                    {
+                        if (FocusNodeIfMatching<QueueDescription>(rootNode, qd => qd.Path, queueDescriptionSource.Path))
+                        {
+                            return;
+                        }
+                    }
                     foreach (TreeNode level1Node in rootNode.Nodes)
                     {
                         if (level1Node.Name == QueueEntities)
@@ -205,6 +213,14 @@ namespace ServiceBusExplorer.Forms
             {
                 foreach (TreeNode rootNode in serviceBusTreeView.Nodes)
                 {
+                    // In the Coral simplified tree the entity list node is the root itself
+                    if (rootNode.Name == TopicEntities)
+                    {
+                        if (FocusNodeIfMatching<TopicDescription>(rootNode, qd => qd.Path, topicDescriptionSource.Path))
+                        {
+                            return;
+                        }
+                    }
                     foreach (TreeNode level1Node in rootNode.Nodes)
                     {
                         if (level1Node.Name == TopicEntities)
