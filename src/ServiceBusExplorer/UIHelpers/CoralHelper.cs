@@ -338,6 +338,22 @@ namespace ServiceBusExplorer.UIHelpers
             tabControl.TabPages.Add(propertiesTabPage);
             parent.Controls.Add(tabControl);
 
+            // Default the payload pane to half the detail view width from the start
+            // (the split then scales proportionally with the window).
+            if (parent.Parent is SplitContainer detailSplitContainer)
+            {
+                try
+                {
+                    detailSplitContainer.SplitterDistance =
+                        (detailSplitContainer.Width - detailSplitContainer.SplitterWidth) / 2;
+                }
+                catch (InvalidOperationException)
+                {
+                    // Panel minimum sizes can reject the value at design-time sizes;
+                    // the load-time assignment will apply it again.
+                }
+            }
+
             // Decoding and rendering the payload for every row is too slow when the user
             // scrolls through the message list, so the update is debounced: the panel
             // clears immediately, and the payload of the row the user settles on is
