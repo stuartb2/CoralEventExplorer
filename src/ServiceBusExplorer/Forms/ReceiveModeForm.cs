@@ -59,6 +59,7 @@ namespace ServiceBusExplorer.Forms
             {
                 cboReceiverInspector.Items.Add(messageInspectors[i]);
             }
+            UIHelpers.CoralHelper.SelectDefaultInspector(cboReceiverInspector);
 
             txtFromSession.Enabled = fromSessionSelectionActive;
         }

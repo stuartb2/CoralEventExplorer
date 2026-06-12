@@ -314,6 +314,10 @@ namespace ServiceBusExplorer.Controls
             btnCopyDeadletterBody = AddCopyBodyButton(grouperDeadletterText, txtDeadletterText);
             btnCopyTransferDeadletterBody = AddCopyBodyButton(grouperTransferDeadletterText, txtTransferDeadletterText);
 
+            CoralHelper.AttachPayloadPanel(grouperMessageText, txtMessageText);
+            CoralHelper.AttachPayloadPanel(grouperDeadletterText, txtDeadletterText);
+            CoralHelper.AttachPayloadPanel(grouperTransferDeadletterText, txtTransferDeadletterText);
+
             InitializeControls(initialCall: true);
         }
         #endregion

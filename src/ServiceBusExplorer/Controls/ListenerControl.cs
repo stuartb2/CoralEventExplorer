@@ -357,6 +357,7 @@ namespace ServiceBusExplorer.Controls
             {
                 cboReceiverInspector.Items.Add(key);
             }
+            CoralHelper.SelectDefaultInspector(cboReceiverInspector);
         }
 
         private void HandleException(Exception ex)

@@ -211,6 +211,9 @@ namespace ServiceBusExplorer.Controls
             btnCopyMessageBody = AddCopyBodyButton(grouperMessageText, txtMessageText);
             btnCopyDeadletterBody = AddCopyBodyButton(grouperDeadletterText, txtDeadletterText);
 
+            CoralHelper.AttachPayloadPanel(grouperMessageText, txtMessageText);
+            CoralHelper.AttachPayloadPanel(grouperDeadletterText, txtDeadletterText);
+
             InitializeControls();
         }
         #endregion

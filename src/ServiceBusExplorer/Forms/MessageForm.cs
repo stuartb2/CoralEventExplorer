@@ -220,6 +220,7 @@ namespace ServiceBusExplorer.Forms
             {
                 cboSenderInspector.Items.Add(key);
             }
+            UIHelpers.CoralHelper.SelectDefaultInspector(cboSenderInspector);
         }
 
         public MessageForm(QueueDescription queueDescription, QueueType queueType, BrokeredMessage brokeredMessage,
@@ -272,6 +273,7 @@ namespace ServiceBusExplorer.Forms
             {
                 cboSenderInspector.Items.Add(key);
             }
+            UIHelpers.CoralHelper.SelectDefaultInspector(cboSenderInspector);
         }
 
         public MessageForm(QueueDescription queueDescription, QueueType queueType, IEnumerable<BrokeredMessage> brokeredMessages,

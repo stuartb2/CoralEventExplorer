@@ -255,6 +255,8 @@ namespace ServiceBusExplorer.Controls
                             cboSenderInspector.Items.Add(key);
                             cboReceiverInspector.Items.Add(key);
                         }
+                        CoralHelper.SelectDefaultInspector(cboSenderInspector);
+                        CoralHelper.SelectDefaultInspector(cboReceiverInspector);
                     }
 
                     if (controlHelper.ServiceBusHelper.BrokeredMessageGenerators != null)

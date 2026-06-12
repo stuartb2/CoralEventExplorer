@@ -147,6 +147,7 @@ namespace ServiceBusExplorer.Controls
                     {
                         cboReceiverInspector.Items.Add(key);
                     }
+                    CoralHelper.SelectDefaultInspector(cboReceiverInspector);
                 }
 
                 // Set Think Time
