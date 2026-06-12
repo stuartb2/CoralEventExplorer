@@ -1,4 +1,4 @@
-﻿#region Copyright
+#region Copyright
 //=======================================================================================
 // Microsoft Azure Customer Advisory Team 
 //
@@ -794,9 +794,7 @@ namespace ServiceBusExplorer.Controls
                 sessionsBindingSource.DataSource = sessionBindingList;
                 sessionsDataGridView.DataSource = sessionsBindingSource;
 
-                sessionsSplitContainer.SplitterDistance = sessionsSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          sessionsSplitContainer.SplitterWidth;
+                sessionsSplitContainer.SplitterDistance = (sessionsSplitContainer.Width - sessionsSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 sessionMainSplitContainer.SplitterDistance =
                     sessionMainSplitContainer.Size.Height / 2 - 8;
 
@@ -1388,9 +1386,7 @@ namespace ServiceBusExplorer.Controls
                 messagesBindingSource.DataSource = messageBindingList;
                 messagesDataGridView.DataSource = messagesBindingSource;
 
-                messagesSplitContainer.SplitterDistance = messagesSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          messagesSplitContainer.SplitterWidth;
+                messagesSplitContainer.SplitterDistance = (messagesSplitContainer.Width - messagesSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 messageMainSplitContainer.SplitterDistance = messageMainSplitContainer.Size.Height / 2 - 8;
 
                 if (!peek)
@@ -1513,9 +1509,7 @@ namespace ServiceBusExplorer.Controls
                 messagesBindingSource.DataSource = messageBindingList;
                 messagesDataGridView.DataSource = messagesBindingSource;
 
-                messagesSplitContainer.SplitterDistance = messagesSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          messagesSplitContainer.SplitterWidth;
+                messagesSplitContainer.SplitterDistance = (messagesSplitContainer.Width - messagesSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 messageMainSplitContainer.SplitterDistance = messageMainSplitContainer.Size.Height / 2 - 8;
 
                 if (!peek)
@@ -1631,9 +1625,7 @@ namespace ServiceBusExplorer.Controls
                 deadletterBindingSource.DataSource = deadletterBindingList;
                 deadletterDataGridView.DataSource = deadletterBindingSource;
 
-                deadletterSplitContainer.SplitterDistance = deadletterSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          deadletterSplitContainer.SplitterWidth;
+                deadletterSplitContainer.SplitterDistance = (deadletterSplitContainer.Width - deadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 deadletterMainSplitContainer.SplitterDistance = deadletterMainSplitContainer.Size.Height / 2 - 8;
 
                 if (!peek)
@@ -1746,9 +1738,7 @@ namespace ServiceBusExplorer.Controls
                 deadletterBindingSource.DataSource = deadletterBindingList;
                 deadletterDataGridView.DataSource = deadletterBindingSource;
 
-                deadletterSplitContainer.SplitterDistance = deadletterSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          deadletterSplitContainer.SplitterWidth;
+                deadletterSplitContainer.SplitterDistance = (deadletterSplitContainer.Width - deadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 deadletterMainSplitContainer.SplitterDistance = deadletterMainSplitContainer.Size.Height / 2 - 8;
 
                 if (!peek)

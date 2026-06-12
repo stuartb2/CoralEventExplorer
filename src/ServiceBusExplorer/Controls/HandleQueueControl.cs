@@ -1,4 +1,4 @@
-﻿#region Copyright
+#region Copyright
 
 //=======================================================================================
 // Microsoft Azure Customer Advisory Team 
@@ -596,9 +596,7 @@ namespace ServiceBusExplorer.Controls
                 sessionsBindingSource.DataSource = sessionBindingList;
                 sessionsDataGridView.DataSource = sessionsBindingSource;
 
-                sessionListStateSplitContainer.SplitterDistance = sessionListStateSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          sessionListStateSplitContainer.SplitterWidth;
+                sessionListStateSplitContainer.SplitterDistance = (sessionListStateSplitContainer.Width - sessionListStateSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 sessionMainSplitContainer.SplitterDistance =
                     sessionMainSplitContainer.Size.Height / 2 - 8;
 
@@ -1497,9 +1495,7 @@ namespace ServiceBusExplorer.Controls
                 messagesBindingSource.DataSource = messageBindingList;
                 messagesDataGridView.DataSource = messagesBindingSource;
 
-                messagesSplitContainer.SplitterDistance = messagesSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          messagesSplitContainer.SplitterWidth;
+                messagesSplitContainer.SplitterDistance = (messagesSplitContainer.Width - messagesSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 messageMainSplitContainer.SplitterDistance = messageMainSplitContainer.Size.Height / 2 - 8;
 
                 messagePropertiesSplitContainer.SplitterDistance = messageMainSplitContainer.SplitterDistance;
@@ -1607,9 +1603,7 @@ namespace ServiceBusExplorer.Controls
                 };
                 messagesBindingSource.DataSource = messageBindingList;
                 messagesDataGridView.DataSource = messagesBindingSource;
-                messagesSplitContainer.SplitterDistance = messagesSplitContainer.Width -
-                                                          GrouperMessagePropertiesWith -
-                                                          messagesSplitContainer.SplitterWidth;
+                messagesSplitContainer.SplitterDistance = (messagesSplitContainer.Width - messagesSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 messageMainSplitContainer.SplitterDistance = messageMainSplitContainer.Size.Height / 2 - 8;
                 messagePropertiesSplitContainer.SplitterDistance = messageMainSplitContainer.SplitterDistance;
 
@@ -1734,9 +1728,7 @@ namespace ServiceBusExplorer.Controls
                 deadletterBindingSource.DataSource = deadletterBindingList;
                 deadletterDataGridView.DataSource = deadletterBindingSource;
 
-                deadletterSplitContainer.SplitterDistance = deadletterSplitContainer.Width -
-                                                            GrouperMessagePropertiesWith -
-                                                            deadletterSplitContainer.SplitterWidth;
+                deadletterSplitContainer.SplitterDistance = (deadletterSplitContainer.Width - deadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 deadletterMainSplitContainer.SplitterDistance =
                     deadletterMainSplitContainer.Size.Height / 2 - 8;
 
@@ -1871,9 +1863,7 @@ namespace ServiceBusExplorer.Controls
                 transferDeadletterBindingSource.DataSource = transferDeadletterBindingList;
                 transferDeadletterDataGridView.DataSource = transferDeadletterBindingSource;
 
-                transferDeadletterSplitContainer.SplitterDistance = transferDeadletterSplitContainer.Width -
-                                                            GrouperMessagePropertiesWith -
-                                                            transferDeadletterSplitContainer.SplitterWidth;
+                transferDeadletterSplitContainer.SplitterDistance = (transferDeadletterSplitContainer.Width - transferDeadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 transferMainSplitContainer.SplitterDistance = transferMainSplitContainer.Size.Height / 2 - 8;
 
 
@@ -1979,9 +1969,7 @@ namespace ServiceBusExplorer.Controls
                 deadletterBindingSource.DataSource = deadletterBindingList;
                 deadletterDataGridView.DataSource = deadletterBindingSource;
 
-                deadletterSplitContainer.SplitterDistance = deadletterSplitContainer.Width -
-                                                            GrouperMessagePropertiesWith -
-                                                            deadletterSplitContainer.SplitterWidth;
+                deadletterSplitContainer.SplitterDistance = (deadletterSplitContainer.Width - deadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
                 deadletterMainSplitContainer.SplitterDistance = deadletterMainSplitContainer.Size.Height / 2 - 8;
 
 
@@ -2075,9 +2063,7 @@ namespace ServiceBusExplorer.Controls
                 transferDeadletterBindingSource.DataSource = transferDeadletterBindingList;
                 transferDeadletterDataGridView.DataSource = transferDeadletterBindingSource;
 
-                transferDeadletterSplitContainer.SplitterDistance = transferDeadletterSplitContainer.Width -
-                                                            GrouperMessagePropertiesWith -
-                                                            transferDeadletterSplitContainer.SplitterWidth;
+                transferDeadletterSplitContainer.SplitterDistance = (transferDeadletterSplitContainer.Width - transferDeadletterSplitContainer.SplitterWidth) / 2; // Coral: payload tab gets half the view
 
                 if (!peek)
                 {
