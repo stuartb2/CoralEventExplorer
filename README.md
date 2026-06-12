@@ -1,5 +1,7 @@
 # Coral Event Explorer
 
+**Fork author:** Stuart Bishop ([@stuartb2](https://github.com/stuartb2))
+
 Coral Event Explorer is a fork of [Service Bus Explorer](https://github.com/paolosalvatori/ServiceBusExplorer)
 by Paolo Salvatori, tailored for working with **Coral** Service Bus namespaces and their
 CloudEvents-style messages.

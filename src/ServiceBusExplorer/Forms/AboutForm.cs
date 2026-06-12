@@ -234,9 +234,9 @@ namespace ServiceBusExplorer.Forms
                 AutoSize = true,
                 BackColor = Color.Transparent,
                 Location = new Point(177, 378),
-                Text = "Coral Event Explorer is a Coral-tailored fork of Service Bus Explorer: topics-only tree,\n" +
-                       "newest-first message paging, CloudEvents data_base64 decoding and payload search.\n" +
-                       "See CORAL.md in the repository for the full list of differences."
+                Text = "Coral Event Explorer is a Coral-tailored fork of Service Bus Explorer by Stuart Bishop:\n" +
+                       "topics-only tree, newest-first message paging, CloudEvents data_base64 decoding and\n" +
+                       "payload search. See CORAL.md in the repository for the full list of differences."
             };
             var lnkCoralRepo = new LinkLabel
             {
