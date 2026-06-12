@@ -280,6 +280,14 @@ namespace ServiceBusExplorer.Forms
             InitializeComponent();
             UIHelpers.CoralTheme.Apply(this);
             panelMain.ControlAdded += (s, e) => UIHelpers.CoralTheme.Apply(e.Control);
+            // Coral: expand tree nodes on a single click instead of requiring the +
+            serviceBusTreeView.NodeMouseClick += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    e.Node.Expand();
+                }
+            };
             logTask = Task.Factory.StartNew(AsyncWriteToLog).ContinueWith(t =>
             {
                 if (t.IsFaulted && t.Exception != null)
