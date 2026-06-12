@@ -169,3 +169,6 @@ $RECYCLE.BIN/
 
 # Event Grid Explorer Library pkgrefgen
 /src/EventGridExplorerLibrary/.pkgrefgen/
+
+# Coral installer build output
+installer/Output/
