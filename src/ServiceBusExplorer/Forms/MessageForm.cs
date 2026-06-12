@@ -142,6 +142,7 @@ namespace ServiceBusExplorer.Forms
             this.serviceBusHelper = serviceBusHelper;
             this.writeToLog = writeToLog;
             InitializeComponent();
+            UIHelpers.CoralTheme.Apply(this);
 
             cboBodyType.SelectedIndex = (int)MainForm.SingletonMainForm.MessageBodyType;
             messagePropertyGrid.SelectedObject = brokeredMessage;
@@ -244,6 +245,7 @@ namespace ServiceBusExplorer.Forms
             this.serviceBusHelper = serviceBusHelper;
             this.writeToLog = writeToLog;
             InitializeComponent();
+            UIHelpers.CoralTheme.Apply(this);
 
             // Make it just a small dialog with the controls on one row
             messagesSplitContainer.Visible = false;

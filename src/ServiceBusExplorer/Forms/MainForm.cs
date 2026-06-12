@@ -273,6 +273,8 @@ namespace ServiceBusExplorer.Forms
         public MainForm(string logMessage)
         {
             InitializeComponent();
+            UIHelpers.CoralTheme.Apply(this);
+            panelMain.ControlAdded += (s, e) => UIHelpers.CoralTheme.Apply(e.Control);
             logTask = Task.Factory.StartNew(AsyncWriteToLog).ContinueWith(t =>
             {
                 if (t.IsFaulted && t.Exception != null)

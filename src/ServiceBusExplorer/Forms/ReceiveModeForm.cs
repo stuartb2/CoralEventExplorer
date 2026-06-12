@@ -46,6 +46,7 @@ namespace ServiceBusExplorer.Forms
         public ReceiveModeForm(string message, int count, IEnumerable<string> brokeredMessageInspectors, bool fromSessionSelectionActive = false)
         {
             InitializeComponent();
+            UIHelpers.CoralTheme.Apply(this);
             Text = message;
             txtMessageCount.Text = count.ToString(CultureInfo.InvariantCulture);
             cboReceiverInspector.Items.Add(SelectBrokeredMessageInspector);
