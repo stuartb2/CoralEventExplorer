@@ -247,26 +247,11 @@ namespace ServiceBusExplorer.Controls
                     HandleException(ex);
                 }
             });
-            // Coral: paging button to load the previous page of messages above the
+            // Coral: paging buttons to load the previous page of messages above the
             // current ones (chronological order preserved).
-            var btnOlderMessages = new Button
-            {
-                Text = "◀ Older " + CoralHelper.PeekPageSize,
-                Dock = DockStyle.Left,
-                Width = 100,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(215, 228, 242),
-                ForeColor = SystemColors.ControlText,
-                Font = new Font("Microsoft Sans Serif", 8.25F)
-            };
-            btnOlderMessages.FlatAppearance.BorderColor = Color.FromArgb(153, 180, 209);
-            btnOlderMessages.FlatAppearance.MouseOverBackColor = Color.FromArgb(153, 180, 209);
-            btnOlderMessages.FlatAppearance.MouseDownBackColor = Color.FromArgb(153, 180, 209);
-            btnOlderMessages.Click += (s, e) => PeekOlderMessages(CoralHelper.PeekPageSize);
-            messagesSearchBox.Parent.Controls.Add(btnOlderMessages);
-            messagesSearchBox.BringToFront();
+            AddOlderButton(messagesSearchBox, () => PeekOlderMessages(CoralHelper.PeekPageSize));
 
-            CoralHelper.AddBodySearchBox(grouperDeadletterList, async text =>
+            var deadletterSearchBox = CoralHelper.AddBodySearchBox(grouperDeadletterList, async text =>
             {
                 try
                 {
@@ -295,6 +280,7 @@ namespace ServiceBusExplorer.Controls
                     HandleException(ex);
                 }
             });
+            AddOlderButton(deadletterSearchBox, () => PeekOlderDeadletterMessages(CoralHelper.PeekPageSize));
 
             InitializeControls();
         }
@@ -347,11 +333,21 @@ namespace ServiceBusExplorer.Controls
 
         #region Coral tail paging
 
-        SubscriptionClient CreatePeekClient()
+        MessageReceiver CreateMessagesPeekReceiver()
         {
-            return serviceBusHelper.MessagingFactory.CreateSubscriptionClient(
-                subscriptionWrapper.SubscriptionDescription.TopicPath,
-                subscriptionWrapper.SubscriptionDescription.Name,
+            return serviceBusHelper.MessagingFactory.CreateMessageReceiver(
+                SubscriptionClient.FormatSubscriptionPath(
+                    subscriptionWrapper.SubscriptionDescription.TopicPath,
+                    subscriptionWrapper.SubscriptionDescription.Name),
+                ReceiveMode.PeekLock);
+        }
+
+        MessageReceiver CreateDeadletterPeekReceiver()
+        {
+            return serviceBusHelper.MessagingFactory.CreateMessageReceiver(
+                SubscriptionClient.FormatDeadLetterPath(
+                    subscriptionWrapper.SubscriptionDescription.TopicPath,
+                    subscriptionWrapper.SubscriptionDescription.Name),
                 ReceiveMode.PeekLock);
         }
 
@@ -381,8 +377,8 @@ namespace ServiceBusExplorer.Controls
                     ReadMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
                     return;
                 }
-                var client = CreatePeekClient();
-                var page = PeekPageEndingAt(client, count, FindLastSequenceNumber(client));
+                var receiver = CreateMessagesPeekReceiver();
+                var page = PeekPageEndingAt(receiver, count, FindLastSequenceNumber(receiver));
                 ShowTailPage(page, replace: true);
             }
             catch (Exception ex)
@@ -420,8 +416,8 @@ namespace ServiceBusExplorer.Controls
                     return;
                 }
                 Cursor.Current = Cursors.WaitCursor;
-                var client = CreatePeekClient();
-                var page = PeekPageEndingAt(client, count, oldestShown - 1);
+                var receiver = CreateMessagesPeekReceiver();
+                var page = PeekPageEndingAt(receiver, count, oldestShown - 1);
                 ShowTailPage(page, replace: false);
             }
             catch (Exception ex)
@@ -434,17 +430,17 @@ namespace ServiceBusExplorer.Controls
             }
         }
 
-        static long? PeekSequenceAtOrAfter(SubscriptionClient client, long fromSequence)
+        static long? PeekSequenceAtOrAfter(MessageReceiver receiver, long fromSequence)
         {
-            var messages = client.PeekBatch(fromSequence, 1);
+            var messages = receiver.PeekBatch(fromSequence, 1);
             return messages?.FirstOrDefault()?.SequenceNumber;
         }
 
         // Finds the sequence number of the newest message via exponential probing
         // followed by a binary search; costs O(log n) one-message peeks.
-        static long? FindLastSequenceNumber(SubscriptionClient client)
+        static long? FindLastSequenceNumber(MessageReceiver receiver)
         {
-            var first = PeekSequenceAtOrAfter(client, 0);
+            var first = PeekSequenceAtOrAfter(receiver, 0);
             if (first == null)
             {
                 return null;
@@ -453,7 +449,7 @@ namespace ServiceBusExplorer.Controls
             long step = 1;
             while (true)
             {
-                var next = PeekSequenceAtOrAfter(client, known + step);
+                var next = PeekSequenceAtOrAfter(receiver, known + step);
                 if (next == null)
                 {
                     break;
@@ -469,7 +465,7 @@ namespace ServiceBusExplorer.Controls
             while (hi - lo > 1)
             {
                 var mid = lo + (hi - lo) / 2;
-                var found = PeekSequenceAtOrAfter(client, mid);
+                var found = PeekSequenceAtOrAfter(receiver, mid);
                 if (found == null)
                 {
                     hi = mid;
@@ -485,7 +481,7 @@ namespace ServiceBusExplorer.Controls
         // Returns up to count messages with sequence numbers up to and including
         // endSequence, in ascending order: the page that ends at endSequence. Widens
         // the scanned window when sequence numbers are sparse.
-        List<BrokeredMessage> PeekPageEndingAt(SubscriptionClient client, int count, long? endSequence)
+        List<BrokeredMessage> PeekPageEndingAt(MessageReceiver receiver, int count, long? endSequence)
         {
             var page = new List<BrokeredMessage>();
             if (endSequence == null)
@@ -499,7 +495,7 @@ namespace ServiceBusExplorer.Controls
                 {
                     windowStart = 0;
                 }
-                page = PeekRange(client, windowStart, endSequence.Value);
+                page = PeekRange(receiver, windowStart, endSequence.Value);
                 if (page.Count >= count || windowStart == 0)
                 {
                     break;
@@ -515,14 +511,14 @@ namespace ServiceBusExplorer.Controls
         }
 
         // Peeks every message with a sequence number in [fromSequence, toSequence].
-        List<BrokeredMessage> PeekRange(SubscriptionClient client, long fromSequence, long toSequence)
+        List<BrokeredMessage> PeekRange(MessageReceiver receiver, long fromSequence, long toSequence)
         {
             var inspector = CreateDefaultInspector();
             var result = new List<BrokeredMessage>();
             var next = fromSequence;
             while (next <= toSequence)
             {
-                var batch = client.PeekBatch(next, 200)?.ToList();
+                var batch = receiver.PeekBatch(next, 200)?.ToList();
                 if (batch == null || batch.Count == 0)
                 {
                     break;
@@ -572,6 +568,141 @@ namespace ServiceBusExplorer.Controls
             {
                 mainTabControl.SelectTab(MessagesTabPage);
             }
+        }
+
+        /// <summary>
+        /// Peeks the newest dead-letter messages (no receive dialog) and shows them in
+        /// chronological order. Used by shift+double-clicking the subscription node.
+        /// </summary>
+        public void PeekLatestDeadletterMessages(int count)
+        {
+            try
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+                {
+                    txtDeadletterText.Text = string.Empty;
+                    deadletterCustomPropertyGrid.SelectedObject = null;
+                    deadletterPropertyGrid.SelectedObject = null;
+                    ReadDeadletterMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
+                    return;
+                }
+                var receiver = CreateDeadletterPeekReceiver();
+                var page = PeekPageEndingAt(receiver, count, FindLastSequenceNumber(receiver));
+                ShowDeadletterTailPage(page, replace: true);
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        /// <summary>
+        /// Loads the page of dead-letter messages immediately preceding the ones
+        /// currently shown and prepends it, preserving chronological order.
+        /// </summary>
+        public void PeekOlderDeadletterMessages(int count)
+        {
+            try
+            {
+                if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+                {
+                    writeToLog("Paging back is not supported on partitioned topics.");
+                    return;
+                }
+                if (deadletterBindingList == null || deadletterBindingList.Count == 0)
+                {
+                    PeekLatestDeadletterMessages(count);
+                    return;
+                }
+                var oldestShown = deadletterBindingList.Min(m => m.SequenceNumber);
+                if (oldestShown <= 0)
+                {
+                    writeToLog("Already showing the oldest message of the dead-letter queue.");
+                    return;
+                }
+                Cursor.Current = Cursors.WaitCursor;
+                var receiver = CreateDeadletterPeekReceiver();
+                var page = PeekPageEndingAt(receiver, count, oldestShown - 1);
+                ShowDeadletterTailPage(page, replace: false);
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        void ShowDeadletterTailPage(List<BrokeredMessage> page, bool replace)
+        {
+            if (page.Count == 0 && !replace)
+            {
+                writeToLog("No earlier messages found in the dead-letter queue.");
+                return;
+            }
+            txtDeadletterText.Text = string.Empty;
+            deadletterCustomPropertyGrid.SelectedObject = null;
+            deadletterPropertyGrid.SelectedObject = null;
+            var messages = new List<BrokeredMessage>(page);
+            if (!replace)
+            {
+                messages.AddRange(deadletterBindingList);
+            }
+            deadletterBindingList = new SortableBindingList<BrokeredMessage>(messages)
+            {
+                AllowEdit = false,
+                AllowNew = false,
+                AllowRemove = false
+            };
+            deadletterBindingSource.DataSource = deadletterBindingList;
+            deadletterDataGridView.DataSource = deadletterBindingSource;
+            writeToLog(string.Format(MessagesPeekedFromTheDeadletterQueue, page.Count, subscriptionWrapper.SubscriptionDescription.Name));
+            if (mainTabControl.TabPages[DeadletterTabPage] == null)
+            {
+                EnablePage(DeadletterTabPage);
+            }
+            if (mainTabControl.TabPages[DeadletterTabPage] != null)
+            {
+                mainTabControl.SelectTab(DeadletterTabPage);
+            }
+        }
+
+        // Adds an "Older N" paging button, with a small gutter, to the left of a
+        // search strip created by CoralHelper.AddBodySearchBox.
+        void AddOlderButton(TextBox searchBox, Action loadOlderPage)
+        {
+            var button = new Button
+            {
+                Text = "◀ Older " + CoralHelper.PeekPageSize,
+                Dock = DockStyle.Left,
+                Width = 100,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(215, 228, 242),
+                ForeColor = SystemColors.ControlText,
+                Font = new Font("Microsoft Sans Serif", 8.25F)
+            };
+            button.FlatAppearance.BorderColor = Color.FromArgb(153, 180, 209);
+            button.FlatAppearance.MouseOverBackColor = Color.FromArgb(153, 180, 209);
+            button.FlatAppearance.MouseDownBackColor = Color.FromArgb(153, 180, 209);
+            button.Click += (s, e) => loadOlderPage();
+            var gutter = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 8,
+                BackColor = Color.Transparent
+            };
+            var parent = searchBox.Parent;
+            parent.Controls.Add(button);
+            parent.Controls.Add(gutter);
+            gutter.BringToFront();    // gutter docks to the right of the button
+            searchBox.BringToFront(); // search box fills the remaining space
         }
         #endregion
 

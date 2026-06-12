@@ -50,6 +50,12 @@ namespace ServiceBusExplorer.UIHelpers
             grouper.Controls.Add(btn);
             btn.BringToFront();
 
+            // Keep the button pinned to the grouper's right edge: CustomPaint-driven
+            // layout only runs when the grouper repaints, which can lag behind
+            // resizes, so position explicitly on every resize as well.
+            grouper.Resize += (s, e) => LayoutTextBoxWithCopyButton(grouper, textBox, btn);
+            LayoutTextBoxWithCopyButton(grouper, textBox, btn);
+
             return btn;
         }
 

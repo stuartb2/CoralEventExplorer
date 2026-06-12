@@ -301,14 +301,30 @@ namespace ServiceBusExplorer.Forms
                 }
             };
             // Coral: double-clicking a subscription peeks its newest messages
-            // immediately. BeginInvoke lets the single-click handling finish showing
-            // the subscription view first.
+            // immediately; shift+double-click peeks its newest dead-letter messages.
+            // BeginInvoke lets the single-click handling finish showing the
+            // subscription view first.
             serviceBusTreeView.NodeMouseDoubleClick += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left && e.Node.Tag is SubscriptionWrapper)
                 {
+                    var deadletter = (ModifierKeys & Keys.Shift) == Keys.Shift;
                     BeginInvoke(new Action(() =>
-                        panelMain.Controls.OfType<HandleSubscriptionControl>().FirstOrDefault()?.PeekLatestMessages(UIHelpers.CoralHelper.PeekPageSize)));
+                    {
+                        var control = panelMain.Controls.OfType<HandleSubscriptionControl>().FirstOrDefault();
+                        if (control == null)
+                        {
+                            return;
+                        }
+                        if (deadletter)
+                        {
+                            control.PeekLatestDeadletterMessages(UIHelpers.CoralHelper.PeekPageSize);
+                        }
+                        else
+                        {
+                            control.PeekLatestMessages(UIHelpers.CoralHelper.PeekPageSize);
+                        }
+                    }));
                 }
             };
             logTask = Task.Factory.StartNew(AsyncWriteToLog).ContinueWith(t =>
