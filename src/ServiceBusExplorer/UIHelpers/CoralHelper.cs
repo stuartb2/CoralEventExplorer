@@ -115,7 +115,7 @@ namespace ServiceBusExplorer.UIHelpers
             {
                 Name = "coralBodySearchPanel_" + listGrouper.Name,
                 Dock = DockStyle.Top,
-                Height = 26,
+                Height = 32,
                 Padding = new Padding(0, 0, 0, 6),
                 BackColor = Color.Transparent
             };
@@ -318,7 +318,7 @@ namespace ServiceBusExplorer.UIHelpers
             {
                 Name = "coralPayloadFindPanel_" + bodyTextBox.Name,
                 Dock = DockStyle.Top,
-                Height = 26,
+                Height = 32,
                 Padding = new Padding(0, 0, 0, 6),
                 BackColor = backColor
             };
