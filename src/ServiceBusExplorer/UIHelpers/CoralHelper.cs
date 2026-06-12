@@ -37,21 +37,35 @@ namespace ServiceBusExplorer.UIHelpers
         }
 
         /// <summary>
-        /// Splits the panel hosting the message body grouper and adds a second grouper below it
-        /// showing the decoded data_base64 payload. The payload stays in sync with the body
-        /// text box: whenever the body changes (row selection, refresh, clear), the payload
-        /// is re-extracted from it.
+        /// Wraps the right-hand properties pane in a tab control with a "Coral Payload" tab
+        /// (selected by default) showing the decoded data_base64 payload, and a "Properties"
+        /// tab holding the original system/custom property grids. The payload stays in sync
+        /// with the body text box: whenever the body changes (row selection, refresh, clear),
+        /// the payload is re-extracted from it.
         /// </summary>
-        internal static FastColoredTextBox AttachPayloadPanel(Controls.Grouper bodyGrouper, FastColoredTextBox bodyTextBox)
+        internal static FastColoredTextBox AttachPayloadTab(Control propertiesContainer, FastColoredTextBox bodyTextBox)
         {
-            var parent = bodyGrouper.Parent;
+            var parent = propertiesContainer.Parent;
+            var backColor = Color.FromArgb(215, 228, 242);
 
-            var splitContainer = new SplitContainer
+            var tabControl = new TabControl
             {
-                Name = "coralPayloadSplitContainer_" + bodyTextBox.Name,
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Horizontal,
-                SplitterWidth = 8
+                Name = "coralTabControl_" + bodyTextBox.Name,
+                Dock = DockStyle.Fill
+            };
+            var payloadTabPage = new TabPage
+            {
+                Name = "coralPayloadTabPage_" + bodyTextBox.Name,
+                Text = "Coral Payload",
+                BackColor = backColor,
+                Padding = new Padding(3)
+            };
+            var propertiesTabPage = new TabPage
+            {
+                Name = "coralPropertiesTabPage_" + bodyTextBox.Name,
+                Text = "Properties",
+                BackColor = backColor,
+                Padding = new Padding(3)
             };
 
             var payloadGrouper = new Controls.Grouper
@@ -92,10 +106,13 @@ namespace ServiceBusExplorer.UIHelpers
             payloadGrouper.CustomPaint += e =>
                 CopyBodyButtonHelper.LayoutTextBoxWithCopyButton(payloadGrouper, payloadTextBox, copyButton);
 
-            parent.Controls.Remove(bodyGrouper);
-            splitContainer.Panel1.Controls.Add(bodyGrouper);
-            splitContainer.Panel2.Controls.Add(payloadGrouper);
-            parent.Controls.Add(splitContainer);
+            parent.Controls.Remove(propertiesContainer);
+            propertiesContainer.Dock = DockStyle.Fill;
+            propertiesTabPage.Controls.Add(propertiesContainer);
+            payloadTabPage.Controls.Add(payloadGrouper);
+            tabControl.TabPages.Add(payloadTabPage);
+            tabControl.TabPages.Add(propertiesTabPage);
+            parent.Controls.Add(tabControl);
 
             bodyTextBox.TextChanged += (s, e) => SetPayloadText(bodyTextBox.Text, payloadTextBox);
 
