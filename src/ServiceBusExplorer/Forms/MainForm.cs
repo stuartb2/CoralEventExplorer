@@ -159,7 +159,7 @@ namespace ServiceBusExplorer.Forms
 
         // Coral: topic path (or path prefix) to expand automatically after the tree loads.
         private static readonly string DefaultExpandTopicPath =
-            ConfigurationManager.AppSettings["defaultExpandTopicPath"] ?? "previsesystems.events";
+            ConfigurationManager.AppSettings["defaultExpandTopicPath"] ?? "previsesystems/events";
         private const string FilteredSubscriptionEntities = "Subscriptions (Filtered)";
         private const string RuleEntities = "Rules";
         private const string QueueEntity = "Queue";
@@ -284,10 +284,17 @@ namespace ServiceBusExplorer.Forms
             InitializeComponent();
             UIHelpers.CoralTheme.Apply(this);
             panelMain.ControlAdded += (s, e) => UIHelpers.CoralTheme.Apply(e.Control);
-            // Coral: expand tree nodes on a single click instead of requiring the +
+            // Coral: expand tree nodes on a single click instead of requiring the +.
+            // Hit-test so clicks on the +/- glyph keep their normal toggle behaviour.
             serviceBusTreeView.NodeMouseClick += (s, e) =>
             {
-                if (e.Button == MouseButtons.Left)
+                if (e.Button != MouseButtons.Left)
+                {
+                    return;
+                }
+                var hit = serviceBusTreeView.HitTest(e.Location);
+                if (hit.Location == TreeViewHitTestLocations.Label ||
+                    hit.Location == TreeViewHitTestLocations.Image)
                 {
                     e.Node.Expand();
                 }
@@ -6383,6 +6390,7 @@ namespace ServiceBusExplorer.Forms
                 if (node.Text.StartsWith(path, StringComparison.OrdinalIgnoreCase))
                 {
                     node.Expand();
+                    node.EnsureVisible();
                 }
                 else if (path.StartsWith(node.Text + "/", StringComparison.OrdinalIgnoreCase))
                 {
