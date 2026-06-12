@@ -326,6 +326,26 @@ namespace ServiceBusExplorer.Controls
             }
         }
 
+        // Coral: peek the top messages without showing the receive dialog, using the
+        // default ZIP inspector. Used by double-clicking a subscription in the tree.
+        public void PeekMessages(int count)
+        {
+            txtMessageText.Text = string.Empty;
+            messageCustomPropertyGrid.SelectedObject = null;
+            messagePropertyGrid.SelectedObject = null;
+            var messageInspector = serviceBusHelper.BrokeredMessageInspectors.ContainsKey(CoralHelper.DefaultBrokeredMessageInspector)
+                ? Activator.CreateInstance(serviceBusHelper.BrokeredMessageInspectors[CoralHelper.DefaultBrokeredMessageInspector]) as IBrokeredMessageInspector
+                : null;
+            if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+            {
+                ReadMessagesOneAtTheTime(peek: true, all: false, count, messageInspector, null);
+            }
+            else
+            {
+                GetMessages(peek: true, all: false, count, messageInspector, null);
+            }
+        }
+
         public void GetDeadletterMessages()
         {
             using (var receiveModeForm = new ReceiveModeForm(RetrieveMessagesFromDeadletterQueue, MainForm.SingletonMainForm.TopCount, serviceBusHelper.BrokeredMessageInspectors.Keys))
