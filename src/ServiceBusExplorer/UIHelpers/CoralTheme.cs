@@ -1,5 +1,6 @@
 #region Using Directives
 
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -114,10 +115,15 @@ namespace ServiceBusExplorer.UIHelpers
                 case ToolStrip strip: // includes MenuStrip and StatusStrip
                     strip.BackColor = DeepTeal;
                     strip.ForeColor = Color.White;
+                    RecolourImageList(strip.ImageList);
                     foreach (ToolStripItem item in strip.Items)
                     {
                         RestyleToolStripItem(item);
                     }
+                    break;
+
+                case TreeView treeView:
+                    RecolourImageList(treeView.ImageList);
                     break;
 
                 case Controls.Grouper grouper:
@@ -170,12 +176,85 @@ namespace ServiceBusExplorer.UIHelpers
         static void RestyleToolStripItem(ToolStripItem item)
         {
             item.ForeColor = Color.White;
+            if (item.Image != null)
+            {
+                item.Image = RecolourBlues(item.Image);
+            }
             if (item is ToolStripDropDownItem dropDownItem)
             {
                 foreach (ToolStripItem child in dropDownItem.DropDownItems)
                 {
                     RestyleToolStripItem(child);
                 }
+            }
+        }
+
+        static readonly HashSet<ImageList> recolouredImageLists = new HashSet<ImageList>();
+
+        static void RecolourImageList(ImageList imageList)
+        {
+            if (imageList == null || !recolouredImageLists.Add(imageList))
+            {
+                return;
+            }
+            for (var i = 0; i < imageList.Images.Count; i++)
+            {
+                imageList.Images[i] = RecolourBlues(imageList.Images[i]);
+            }
+        }
+
+        /// <summary>
+        /// Remaps blue hues in an image to the Coral theme yellow, preserving each
+        /// pixel's saturation and brightness so shading survives.
+        /// </summary>
+        static Bitmap RecolourBlues(Image image)
+        {
+            var bitmap = new Bitmap(image);
+            for (var y = 0; y < bitmap.Height; y++)
+            {
+                for (var x = 0; x < bitmap.Width; x++)
+                {
+                    var colour = bitmap.GetPixel(x, y);
+                    if (colour.A == 0)
+                    {
+                        continue;
+                    }
+                    RgbToHsv(colour, out var hue, out var saturation, out var value);
+                    if (saturation > 0.15f && hue >= 160f && hue <= 280f)
+                    {
+                        bitmap.SetPixel(x, y, HsvToRgb(60f, saturation, value, colour.A));
+                    }
+                }
+            }
+            return bitmap;
+        }
+
+        static void RgbToHsv(Color colour, out float hue, out float saturation, out float value)
+        {
+            float r = colour.R / 255f, g = colour.G / 255f, b = colour.B / 255f;
+            var max = System.Math.Max(r, System.Math.Max(g, b));
+            var min = System.Math.Min(r, System.Math.Min(g, b));
+            value = max;
+            saturation = max == 0 ? 0 : (max - min) / max;
+            hue = colour.GetHue();
+        }
+
+        static Color HsvToRgb(float hue, float saturation, float value, int alpha)
+        {
+            var hi = (int)(hue / 60f) % 6;
+            var f = hue / 60f - (int)(hue / 60f);
+            var v = value * 255f;
+            var p = v * (1 - saturation);
+            var q = v * (1 - f * saturation);
+            var t = v * (1 - (1 - f) * saturation);
+            switch (hi)
+            {
+                case 0: return Color.FromArgb(alpha, (int)v, (int)t, (int)p);
+                case 1: return Color.FromArgb(alpha, (int)q, (int)v, (int)p);
+                case 2: return Color.FromArgb(alpha, (int)p, (int)v, (int)t);
+                case 3: return Color.FromArgb(alpha, (int)p, (int)q, (int)v);
+                case 4: return Color.FromArgb(alpha, (int)t, (int)p, (int)v);
+                default: return Color.FromArgb(alpha, (int)v, (int)p, (int)q);
             }
         }
 
