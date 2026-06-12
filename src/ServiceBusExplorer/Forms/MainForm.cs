@@ -156,6 +156,10 @@ namespace ServiceBusExplorer.Forms
         // Disable by setting topicsOnlyTree=false in the configuration file.
         private static readonly bool TopicsOnlyTree =
             !string.Equals(ConfigurationManager.AppSettings["topicsOnlyTree"], "false", StringComparison.OrdinalIgnoreCase);
+
+        // Coral: topic path (or path prefix) to expand automatically after the tree loads.
+        private static readonly string DefaultExpandTopicPath =
+            ConfigurationManager.AppSettings["defaultExpandTopicPath"] ?? "previsesystems.events";
         private const string FilteredSubscriptionEntities = "Subscriptions (Filtered)";
         private const string RuleEntities = "Rules";
         private const string QueueEntity = "Queue";
@@ -4910,6 +4914,11 @@ namespace ServiceBusExplorer.Forms
                     relayServiceListNode?.Expand();
 
                     rootNode.Expand();
+
+                    if (topicListNode != null && !string.IsNullOrWhiteSpace(DefaultExpandTopicPath))
+                    {
+                        ExpandMatchingTopicNodes(topicListNode.Nodes, DefaultExpandTopicPath);
+                    }
                     if (entityType != EntityType.All)
                         return;
 
@@ -6360,6 +6369,25 @@ namespace ServiceBusExplorer.Forms
                 if (node.Nodes.ContainsKey(path))
                 {
                     node.Nodes.RemoveByKey(path);
+                }
+            }
+        }
+
+        // Coral: expands the topic nodes leading to and matching the configured default
+        // path, e.g. "previsesystems.events" opens that folder (or every topic node
+        // whose name starts with it).
+        private static void ExpandMatchingTopicNodes(TreeNodeCollection nodes, string path)
+        {
+            foreach (TreeNode node in nodes)
+            {
+                if (node.Text.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                {
+                    node.Expand();
+                }
+                else if (path.StartsWith(node.Text + "/", StringComparison.OrdinalIgnoreCase))
+                {
+                    node.Expand();
+                    ExpandMatchingTopicNodes(node.Nodes, path.Substring(node.Text.Length + 1));
                 }
             }
         }
