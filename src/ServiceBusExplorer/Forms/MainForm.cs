@@ -151,6 +151,11 @@ namespace ServiceBusExplorer.Forms
         private const string ConsumerGroupEntities = "Consumer Groups";
         private const string FilteredQueueEntities = "Queues (Filtered)";
         private const string FilteredTopicEntities = "Topics (Filtered)";
+
+        // Coral: show only the topics in the tree, with the Topics list as the root.
+        // Disable by setting topicsOnlyTree=false in the configuration file.
+        private static readonly bool TopicsOnlyTree =
+            !string.Equals(ConfigurationManager.AppSettings["topicsOnlyTree"], "false", StringComparison.OrdinalIgnoreCase);
         private const string FilteredSubscriptionEntities = "Subscriptions (Filtered)";
         private const string RuleEntities = "Rules";
         private const string QueueEntity = "Queue";
@@ -4595,7 +4600,25 @@ namespace ServiceBusExplorer.Forms
                     var loadEventHubs = SelectedEntities.Contains(Constants.EventHubEntities) && (!isAad || serviceBusHelper.IsEventHubNamespace);
                     var loadNotificationHubs = !isAad && SelectedEntities.Contains(Constants.NotificationHubEntities);
                     var loadRelays = !isAad && SelectedEntities.Contains(Constants.RelayEntities);
-                    if (entityType == EntityType.All)
+                    if (TopicsOnlyTree && !serviceBusHelper.IsEventHubNamespace)
+                    {
+                        // Coral simplified tree: the Topics list is the tree root, with
+                        // the topics directly under it. No namespace node and no other
+                        // entity types.
+                        loadQueues = false;
+                        loadEventHubs = false;
+                        loadNotificationHubs = false;
+                        loadRelays = false;
+                        loadTopics = true;
+                        if (entityType == EntityType.All)
+                        {
+                            serviceBusTreeView.Nodes.Clear();
+                            rootNode = serviceBusTreeView.Nodes.Add(Constants.TopicEntities, Constants.TopicEntities, TopicListIconIndex, TopicListIconIndex);
+                            rootNode.ContextMenuStrip = topicsContextMenuStrip;
+                            topicListNode = rootNode;
+                        }
+                    }
+                    else if (entityType == EntityType.All)
                     {
                         serviceBusTreeView.Nodes.Clear();
                         rootNode = serviceBusTreeView.Nodes.Add(serviceBusHelper.NamespaceUri.AbsoluteUri, serviceBusHelper.NamespaceUri.AbsoluteUri, AzureIconIndex, AzureIconIndex);
@@ -6338,6 +6361,12 @@ namespace ServiceBusExplorer.Forms
             if (string.IsNullOrWhiteSpace(path) || node == null)
             {
                 return null;
+            }
+            // In the simplified (topics-only) tree the Topics list node is the tree
+            // root itself, so a lookup may match the starting node directly.
+            if (node.Name == path)
+            {
+                return node;
             }
             var segments = path.Split('/');
             if (segments.Length > 1)
