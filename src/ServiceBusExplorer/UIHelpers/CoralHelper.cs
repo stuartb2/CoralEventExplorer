@@ -256,7 +256,8 @@ namespace ServiceBusExplorer.UIHelpers
                 Font = new Font("Courier New", 9.75F),
                 ForeColor = SystemColors.ControlText,
                 Location = new Point(16, 32),
-                Language = Language.JSON
+                Language = Language.JSON,
+                ShowFoldingLines = true
             };
 
             payloadGrouper.Controls.Add(payloadTextBox);
@@ -399,6 +400,12 @@ namespace ServiceBusExplorer.UIHelpers
             payloadTextBox.Range.ClearStyle(StyleIndex.All);
             payloadTextBox.Language = isJson ? Language.JSON : Language.Custom;
             payloadTextBox.Text = payloadText;
+            if (isJson)
+            {
+                // Make objects and arrays foldable via the +/- gutter markers.
+                payloadTextBox.Range.SetFoldingMarkers("{", "}");
+                payloadTextBox.Range.SetFoldingMarkers(@"\[", @"\]");
+            }
         }
 
         static string TryExtractPayload(string messageBodyText)
