@@ -218,7 +218,7 @@ namespace ServiceBusExplorer.Controls
             CoralHelper.AttachPayloadTab(messagePropertiesSplitContainer, txtMessageText);
             CoralHelper.AttachPayloadTab(deadletterPropertiesSplitContainer, txtDeadletterText);
 
-            CoralHelper.AddBodySearchBox(grouperMessageList, async text =>
+            var messagesSearchBox = CoralHelper.AddBodySearchBox(grouperMessageList, async text =>
             {
                 try
                 {
@@ -247,6 +247,25 @@ namespace ServiceBusExplorer.Controls
                     HandleException(ex);
                 }
             });
+            // Coral: paging button to load the previous page of messages above the
+            // current ones (chronological order preserved).
+            var btnOlderMessages = new Button
+            {
+                Text = "◀ Older " + CoralHelper.PeekPageSize,
+                Dock = DockStyle.Left,
+                Width = 100,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(215, 228, 242),
+                ForeColor = SystemColors.ControlText,
+                Font = new Font("Microsoft Sans Serif", 8.25F)
+            };
+            btnOlderMessages.FlatAppearance.BorderColor = Color.FromArgb(153, 180, 209);
+            btnOlderMessages.FlatAppearance.MouseOverBackColor = Color.FromArgb(153, 180, 209);
+            btnOlderMessages.FlatAppearance.MouseDownBackColor = Color.FromArgb(153, 180, 209);
+            btnOlderMessages.Click += (s, e) => PeekOlderMessages(CoralHelper.PeekPageSize);
+            messagesSearchBox.Parent.Controls.Add(btnOlderMessages);
+            messagesSearchBox.BringToFront();
+
             CoralHelper.AddBodySearchBox(grouperDeadletterList, async text =>
             {
                 try
@@ -326,25 +345,235 @@ namespace ServiceBusExplorer.Controls
             }
         }
 
-        // Coral: peek the top messages without showing the receive dialog, using the
-        // default ZIP inspector. Used by double-clicking a subscription in the tree.
-        public void PeekMessages(int count)
+        #region Coral tail paging
+
+        SubscriptionClient CreatePeekClient()
         {
+            return serviceBusHelper.MessagingFactory.CreateSubscriptionClient(
+                subscriptionWrapper.SubscriptionDescription.TopicPath,
+                subscriptionWrapper.SubscriptionDescription.Name,
+                ReceiveMode.PeekLock);
+        }
+
+        IBrokeredMessageInspector CreateDefaultInspector()
+        {
+            return serviceBusHelper.BrokeredMessageInspectors.ContainsKey(CoralHelper.DefaultBrokeredMessageInspector)
+                ? Activator.CreateInstance(serviceBusHelper.BrokeredMessageInspectors[CoralHelper.DefaultBrokeredMessageInspector]) as IBrokeredMessageInspector
+                : null;
+        }
+
+        /// <summary>
+        /// Peeks the newest messages of the subscription (no receive dialog) and shows
+        /// them in chronological order. Used by double-clicking the subscription node.
+        /// </summary>
+        public void PeekLatestMessages(int count)
+        {
+            try
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+                {
+                    // Sequence numbers are per partition, so tail paging is not possible:
+                    // fall back to peeking from the front of the subscription.
+                    txtMessageText.Text = string.Empty;
+                    messageCustomPropertyGrid.SelectedObject = null;
+                    messagePropertyGrid.SelectedObject = null;
+                    ReadMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
+                    return;
+                }
+                var client = CreatePeekClient();
+                var page = PeekPageEndingAt(client, count, FindLastSequenceNumber(client));
+                ShowTailPage(page, replace: true);
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        /// <summary>
+        /// Loads the page of messages immediately preceding the ones currently shown and
+        /// prepends it to the list, preserving chronological order.
+        /// </summary>
+        public void PeekOlderMessages(int count)
+        {
+            try
+            {
+                if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+                {
+                    writeToLog("Paging back is not supported on partitioned topics.");
+                    return;
+                }
+                if (messageBindingList == null || messageBindingList.Count == 0)
+                {
+                    PeekLatestMessages(count);
+                    return;
+                }
+                var oldestShown = messageBindingList.Min(m => m.SequenceNumber);
+                if (oldestShown <= 0)
+                {
+                    writeToLog("Already showing the oldest message of the subscription.");
+                    return;
+                }
+                Cursor.Current = Cursors.WaitCursor;
+                var client = CreatePeekClient();
+                var page = PeekPageEndingAt(client, count, oldestShown - 1);
+                ShowTailPage(page, replace: false);
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        static long? PeekSequenceAtOrAfter(SubscriptionClient client, long fromSequence)
+        {
+            var messages = client.PeekBatch(fromSequence, 1);
+            return messages?.FirstOrDefault()?.SequenceNumber;
+        }
+
+        // Finds the sequence number of the newest message via exponential probing
+        // followed by a binary search; costs O(log n) one-message peeks.
+        static long? FindLastSequenceNumber(SubscriptionClient client)
+        {
+            var first = PeekSequenceAtOrAfter(client, 0);
+            if (first == null)
+            {
+                return null;
+            }
+            var known = first.Value;
+            long step = 1;
+            while (true)
+            {
+                var next = PeekSequenceAtOrAfter(client, known + step);
+                if (next == null)
+                {
+                    break;
+                }
+                known = next.Value;
+                if (step < long.MaxValue / 4)
+                {
+                    step *= 2;
+                }
+            }
+            var lo = known;        // a sequence number that exists
+            var hi = known + step; // no message at or after this one
+            while (hi - lo > 1)
+            {
+                var mid = lo + (hi - lo) / 2;
+                var found = PeekSequenceAtOrAfter(client, mid);
+                if (found == null)
+                {
+                    hi = mid;
+                }
+                else
+                {
+                    lo = found.Value;
+                }
+            }
+            return lo;
+        }
+
+        // Returns up to count messages with sequence numbers up to and including
+        // endSequence, in ascending order: the page that ends at endSequence. Widens
+        // the scanned window when sequence numbers are sparse.
+        List<BrokeredMessage> PeekPageEndingAt(SubscriptionClient client, int count, long? endSequence)
+        {
+            var page = new List<BrokeredMessage>();
+            if (endSequence == null)
+            {
+                return page;
+            }
+            var windowStart = endSequence.Value - count * 2L + 1;
+            for (var attempt = 0; attempt < 8; attempt++)
+            {
+                if (windowStart < 0)
+                {
+                    windowStart = 0;
+                }
+                page = PeekRange(client, windowStart, endSequence.Value);
+                if (page.Count >= count || windowStart == 0)
+                {
+                    break;
+                }
+                var width = endSequence.Value - windowStart + 1;
+                windowStart = endSequence.Value - width * 4 + 1;
+            }
+            if (page.Count > count)
+            {
+                page.RemoveRange(0, page.Count - count);
+            }
+            return page;
+        }
+
+        // Peeks every message with a sequence number in [fromSequence, toSequence].
+        List<BrokeredMessage> PeekRange(SubscriptionClient client, long fromSequence, long toSequence)
+        {
+            var inspector = CreateDefaultInspector();
+            var result = new List<BrokeredMessage>();
+            var next = fromSequence;
+            while (next <= toSequence)
+            {
+                var batch = client.PeekBatch(next, 200)?.ToList();
+                if (batch == null || batch.Count == 0)
+                {
+                    break;
+                }
+                foreach (var message in batch)
+                {
+                    if (message.SequenceNumber > toSequence)
+                    {
+                        return result;
+                    }
+                    result.Add(inspector != null ? inspector.AfterReceiveMessage(message) : message);
+                }
+                next = batch[batch.Count - 1].SequenceNumber + 1;
+            }
+            return result;
+        }
+
+        void ShowTailPage(List<BrokeredMessage> page, bool replace)
+        {
+            if (page.Count == 0 && !replace)
+            {
+                writeToLog("No earlier messages found in the subscription.");
+                return;
+            }
             txtMessageText.Text = string.Empty;
             messageCustomPropertyGrid.SelectedObject = null;
             messagePropertyGrid.SelectedObject = null;
-            var messageInspector = serviceBusHelper.BrokeredMessageInspectors.ContainsKey(CoralHelper.DefaultBrokeredMessageInspector)
-                ? Activator.CreateInstance(serviceBusHelper.BrokeredMessageInspectors[CoralHelper.DefaultBrokeredMessageInspector]) as IBrokeredMessageInspector
-                : null;
-            if (subscriptionWrapper.TopicDescription.EnablePartitioning)
+            var messages = new List<BrokeredMessage>(page);
+            if (!replace)
             {
-                ReadMessagesOneAtTheTime(peek: true, all: false, count, messageInspector, null);
+                messages.AddRange(messageBindingList);
             }
-            else
+            messageBindingList = new SortableBindingList<BrokeredMessage>(messages)
             {
-                GetMessages(peek: true, all: false, count, messageInspector, null);
+                AllowEdit = false,
+                AllowNew = false,
+                AllowRemove = false
+            };
+            messagesBindingSource.DataSource = messageBindingList;
+            messagesDataGridView.DataSource = messagesBindingSource;
+            writeToLog(string.Format(MessagesPeekedFromTheSubscription, page.Count, subscriptionWrapper.SubscriptionDescription.Name));
+            if (mainTabControl.TabPages[MessagesTabPage] == null)
+            {
+                EnablePage(MessagesTabPage);
+            }
+            if (mainTabControl.TabPages[MessagesTabPage] != null)
+            {
+                mainTabControl.SelectTab(MessagesTabPage);
             }
         }
+        #endregion
 
         public void GetDeadletterMessages()
         {

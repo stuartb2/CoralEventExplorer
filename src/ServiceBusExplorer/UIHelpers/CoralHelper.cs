@@ -29,6 +29,17 @@ namespace ServiceBusExplorer.UIHelpers
     {
         internal const string DefaultBrokeredMessageInspector = "ZipBrokeredMessageInspector";
 
+        // Page size for the tail peek triggered by double-clicking a subscription and
+        // by the "Older" paging button. Configurable via doubleClickPeekMessageCount.
+        internal static readonly int PeekPageSize = GetPeekPageSize();
+
+        static int GetPeekPageSize()
+        {
+            return int.TryParse(System.Configuration.ConfigurationManager.AppSettings["doubleClickPeekMessageCount"], out var count) && count > 0
+                ? count
+                : 50;
+        }
+
         const string PayloadFieldName = "data_base64";
         const string PayloadPanelTitle = "Coral Payload (data_base64)";
 

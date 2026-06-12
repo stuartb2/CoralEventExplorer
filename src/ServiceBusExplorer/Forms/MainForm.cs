@@ -161,15 +161,6 @@ namespace ServiceBusExplorer.Forms
         private static readonly string DefaultExpandTopicPath =
             ConfigurationManager.AppSettings["defaultExpandTopicPath"] ?? "previsesystems/events";
 
-        // Coral: how many messages to peek when double-clicking a subscription.
-        private static readonly int DoubleClickPeekCount = GetDoubleClickPeekCount();
-
-        private static int GetDoubleClickPeekCount()
-        {
-            return int.TryParse(ConfigurationManager.AppSettings["doubleClickPeekMessageCount"], out var count) && count > 0
-                ? count
-                : 50;
-        }
         private const string FilteredSubscriptionEntities = "Subscriptions (Filtered)";
         private const string RuleEntities = "Rules";
         private const string QueueEntity = "Queue";
@@ -309,15 +300,15 @@ namespace ServiceBusExplorer.Forms
                     e.Node.Expand();
                 }
             };
-            // Coral: double-clicking a subscription peeks its top messages immediately.
-            // BeginInvoke lets the single-click handling finish showing the
-            // subscription view first.
+            // Coral: double-clicking a subscription peeks its newest messages
+            // immediately. BeginInvoke lets the single-click handling finish showing
+            // the subscription view first.
             serviceBusTreeView.NodeMouseDoubleClick += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left && e.Node.Tag is SubscriptionWrapper)
                 {
                     BeginInvoke(new Action(() =>
-                        panelMain.Controls.OfType<HandleSubscriptionControl>().FirstOrDefault()?.PeekMessages(DoubleClickPeekCount)));
+                        panelMain.Controls.OfType<HandleSubscriptionControl>().FirstOrDefault()?.PeekLatestMessages(UIHelpers.CoralHelper.PeekPageSize)));
                 }
             };
             logTask = Task.Factory.StartNew(AsyncWriteToLog).ContinueWith(t =>
