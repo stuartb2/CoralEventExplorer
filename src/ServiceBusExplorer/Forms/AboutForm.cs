@@ -216,6 +216,39 @@ namespace ServiceBusExplorer.Forms
             Text = $"About {MainForm.SingletonMainForm.Text}";
             lblExeVersion.Text = VersionProvider.GetExeVersion();
             lblClientVersion.Text = VersionProvider.GetServiceBusClientVersion();
+
+            // Coral: describe this fork and link to its repository. The labels are
+            // created here rather than in the designer to keep the upstream-merge
+            // surface of the designer file small.
+            ClientSize = new Size(ClientSize.Width, 460);
+            var lblCoralTitle = new Label
+            {
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Font = new Font(Font, FontStyle.Bold),
+                Location = new Point(177, 358),
+                Text = "About this fork"
+            };
+            var lblCoralInfo = new Label
+            {
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Location = new Point(177, 378),
+                Text = "Coral Event Explorer is a Coral-tailored fork of Service Bus Explorer: topics-only tree,\n" +
+                       "newest-first message paging, CloudEvents data_base64 decoding and payload search.\n" +
+                       "See CORAL.md in the repository for the full list of differences."
+            };
+            var lnkCoralRepo = new LinkLabel
+            {
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Location = new Point(177, 420),
+                Text = "https://github.com/stuartb2/CoralEventExplorer"
+            };
+            lnkCoralRepo.LinkClicked += (s, args) => Process.Start("https://github.com/stuartb2/CoralEventExplorer");
+            Controls.Add(lblCoralTitle);
+            Controls.Add(lblCoralInfo);
+            Controls.Add(lnkCoralRepo);
         }
         #endregion
     }
