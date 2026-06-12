@@ -26,6 +26,7 @@
 		<BootstrapperEnabled>true</BootstrapperEnabled>
 		<GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
 		<LangVersion>8</LangVersion>
+		<AssemblyName>CoralEventExplorer</AssemblyName>
 		<AssemblyTitle>Coral Event Explorer</AssemblyTitle>
 		<Company>Paolo Salvatori</Company>
 		<Product>Coral Event Explorer</Product>
