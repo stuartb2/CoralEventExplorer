@@ -8,19 +8,20 @@ using System.Windows.Forms;
 namespace ServiceBusExplorer.UIHelpers
 {
     /// <summary>
-    /// Previse/Coral brand palette (from 210210_PVS_ecosystem logo artwork) applied at
+    /// Coral brand palette (from the Coral web app's variables.css) applied at
     /// runtime over the stock pale-blue theme, which is hard-coded throughout the
     /// designer files. Walks a control tree and swaps the stock colours for brand ones.
     /// </summary>
     internal static class CoralTheme
     {
-        // Brand palette
-        internal static readonly Color DeepTeal = Color.FromArgb(19, 68, 84);
-        internal static readonly Color MidTeal = Color.FromArgb(65, 91, 107);
-        internal static readonly Color Lime = Color.FromArgb(203, 212, 33);
-        internal static readonly Color CoolGrey = Color.FromArgb(166, 174, 183);
-        // Light teal-tinted surface keeping content areas readable
-        internal static readonly Color Surface = Color.FromArgb(228, 236, 239);
+        // Coral web app palette
+        internal static readonly Color DeepTeal = Color.FromArgb(0x1e, 0x44, 0x55);   // --primary-color
+        internal static readonly Color MidTeal = Color.FromArgb(0x3a, 0x51, 0x5c);    // --odd-row-color
+        internal static readonly Color Lime = Color.FromArgb(0xe8, 0xe8, 0x70);       // --secondary-color
+        internal static readonly Color Amber = Color.FromArgb(0xed, 0xad, 0x27);      // --secondary-dark-color
+        internal static readonly Color CoolGrey = Color.FromArgb(0xb0, 0xb0, 0xb9);   // --grey-color
+        // Light tint of the primary teal keeping content areas readable
+        internal static readonly Color Surface = Color.FromArgb(232, 238, 241);
 
         // Stock theme colours to replace
         static readonly Color StockPanelBlue = Color.FromArgb(215, 228, 242);
