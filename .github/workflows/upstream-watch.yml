@@ -1,0 +1,46 @@
+# Coral: opens an issue on this repo when upstream Service Bus Explorer publishes
+# a release newer than the baseline recorded in upstream-version.txt.
+name: Watch upstream releases
+
+on:
+  schedule:
+    - cron: "0 7 * * 1" # Mondays 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare upstream release with recorded baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/paolosalvatori/ServiceBusExplorer/releases/latest --jq .tag_name)
+          baseline=$(tr -d '[:space:]' < upstream-version.txt)
+          echo "Upstream latest: $latest — recorded baseline: $baseline"
+          if [ "$latest" = "$baseline" ]; then
+            echo "Fork is based on the latest upstream release."
+            exit 0
+          fi
+          title="Upstream Service Bus Explorer $latest released (fork baseline: $baseline)"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq length)
+          if [ "$existing" != "0" ]; then
+            echo "Issue already open."
+            exit 0
+          fi
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$(cat <<EOF
+          Upstream has published release **$latest**; this fork's recorded baseline is **$baseline**.
+
+          To bring the fork up to date:
+          1. \`git fetch upstream\` then merge \`upstream/main\` into \`main\` and push.
+          2. Merge \`main\` into \`coral-event-explorer\` and resolve any conflicts.
+          3. Update \`upstream-version.txt\` to \`$latest\`.
+          4. Bump the version in the csproj and installer script, build, and publish a new \`coral-vX.Y.Z\` release so users get the in-app new-version notification.
+          EOF
+          )"

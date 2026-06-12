@@ -57,7 +57,7 @@ namespace ServiceBusExplorer.Forms
        
         private void siteLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            Process.Start("https://github.com/paolosalvatori/ServiceBusExplorer");
+            Process.Start("https://github.com/stuartb2/CoralEventExplorer/releases");
         }
 
         private void mailLinkLabel_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)

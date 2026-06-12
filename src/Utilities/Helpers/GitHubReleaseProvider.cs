@@ -94,8 +94,10 @@ namespace ServiceBusExplorer.Utilities.Helpers
                 var responseBody = string.Empty;
                 try
                 {
-                    client.DefaultRequestHeaders.Add("User-Agent", "ASBE");
-                    responseBody = await client.GetStringAsync("https://api.github.com/repos/paolosalvatori/ServiceBusExplorer/releases/latest")
+                    client.DefaultRequestHeaders.Add("User-Agent", "CoralEventExplorer");
+                    // Coral: check this fork's releases, not upstream's. The fork is
+                    // versioned independently (coral-vX.Y.Z tags).
+                    responseBody = await client.GetStringAsync("https://api.github.com/repos/stuartb2/CoralEventExplorer/releases/latest")
                         .ConfigureAwait(false);
                 }
                 catch (HttpRequestException e)
@@ -114,13 +116,19 @@ namespace ServiceBusExplorer.Utilities.Helpers
                     try
                     {
                         var latestReleaseInfo = JsonConvert.DeserializeObject<Release>(responseBody);
-                        if (latestReleaseInfo != null && !string.IsNullOrWhiteSpace(latestReleaseInfo.Name))
+                        if (latestReleaseInfo != null)
                         {
-                            var version = new Version(latestReleaseInfo.Name);
-                            var uri = latestReleaseInfo.HtmlUrl;
-                            var zipUrl = latestReleaseInfo.Assets.FirstOrDefault(x => x.Name.EndsWith(".zip"))?.BrowserDownloadUrl;
-                            nextReleaseInfo = new ReleaseInfo(uri, version,
-                                latestReleaseInfo.Body, zipUrl);
+                            // The version is embedded in the tag (e.g. coral-v1.0.0).
+                            var versionMatch = System.Text.RegularExpressions.Regex.Match(
+                                latestReleaseInfo.TagName ?? latestReleaseInfo.Name ?? string.Empty, @"\d+(\.\d+)+");
+                            if (versionMatch.Success)
+                            {
+                                var version = new Version(versionMatch.Value);
+                                var uri = latestReleaseInfo.HtmlUrl;
+                                var zipUrl = latestReleaseInfo.Assets.FirstOrDefault(x => x.Name.EndsWith(".zip"))?.BrowserDownloadUrl;
+                                nextReleaseInfo = new ReleaseInfo(uri, version,
+                                    latestReleaseInfo.Body, zipUrl);
+                            }
                         }
                     }
                     catch (Exception e)
