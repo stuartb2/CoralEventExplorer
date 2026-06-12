@@ -334,6 +334,17 @@ namespace ServiceBusExplorer.Forms
                     WriteToLog(t.Exception.Message);
                 }
             });
+            // Coral: halve the log height and make the topic tree 20% narrower.
+            try
+            {
+                var logHeight = mainSplitContainer.Height - mainSplitContainer.SplitterDistance - mainSplitContainer.SplitterWidth;
+                mainSplitContainer.SplitterDistance += logHeight / 2;
+                splitContainer.SplitterDistance = splitContainer.SplitterDistance * 4 / 5;
+            }
+            catch (InvalidOperationException)
+            {
+                // Panel minimum sizes can reject the values; keep the designer layout.
+            }
             mainSplitterDistance = mainSplitContainer.SplitterDistance;
             splitterContainerDistance = splitContainer.SplitterDistance;
             treeViewFontSize = (decimal)serviceBusTreeView.Font.Size;
