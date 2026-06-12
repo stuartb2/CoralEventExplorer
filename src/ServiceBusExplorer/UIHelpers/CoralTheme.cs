@@ -29,6 +29,29 @@ namespace ServiceBusExplorer.UIHelpers
 
         static bool rendererInstalled;
 
+        static Icon appIcon;
+        static bool appIconLoaded;
+
+        static Icon AppIcon
+        {
+            get
+            {
+                if (!appIconLoaded)
+                {
+                    appIconLoaded = true;
+                    try
+                    {
+                        appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                    }
+                    catch (System.Exception)
+                    {
+                        appIcon = null;
+                    }
+                }
+                return appIcon;
+            }
+        }
+
         internal static void Apply(Control root)
         {
             if (root == null)
@@ -67,6 +90,12 @@ namespace ServiceBusExplorer.UIHelpers
             {
                 case Form form:
                     form.BackColor = Surface;
+                    // Forms embed their own (blue) copy of the logo in their resources;
+                    // use the recoloured application icon instead.
+                    if (AppIcon != null)
+                    {
+                        form.Icon = AppIcon;
+                    }
                     break;
 
                 case SplitContainer splitContainer:
