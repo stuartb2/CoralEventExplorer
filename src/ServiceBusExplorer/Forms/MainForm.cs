@@ -4432,7 +4432,7 @@ namespace ServiceBusExplorer.Forms
 
         private void SetTitle(string prefix, string explorer)
         {
-            this.Text = $"{prefix} - {explorer} Explorer";
+            this.Text = $"{prefix} - Coral Event Explorer";
         }
 
         #endregion

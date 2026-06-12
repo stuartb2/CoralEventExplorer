@@ -26,10 +26,10 @@
 		<BootstrapperEnabled>true</BootstrapperEnabled>
 		<GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
 		<LangVersion>8</LangVersion>
-		<AssemblyTitle>Service Bus Explorer</AssemblyTitle>
+		<AssemblyTitle>Coral Event Explorer</AssemblyTitle>
 		<Company>Paolo Salvatori</Company>
-		<Product>Service Bus Explorer</Product>
-		<Description>The Service Bus Explorer allows users to connect to a Service Bus namespace and administer messaging entities in an easy manner. The tool provides advanced features like import/export functionality or the ability to test topic, queues, subscriptions, relay services, notification hubs and events hubs.</Description>
+		<Product>Coral Event Explorer</Product>
+		<Description>Coral Event Explorer is a Coral-tailored fork of Service Bus Explorer by Paolo Salvatori. It connects to Coral Service Bus namespaces and focuses on browsing topics, subscriptions and CloudEvents payloads.</Description>
 		<Copyright>Copyright 2017 Paolo Salvatori</Copyright>
 		<OutputPath>bin\$(Configuration)\</OutputPath>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
