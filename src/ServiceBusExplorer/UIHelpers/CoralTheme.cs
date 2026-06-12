@@ -115,7 +115,8 @@ namespace ServiceBusExplorer.UIHelpers
                 case ToolStrip strip: // includes MenuStrip and StatusStrip
                     strip.BackColor = DeepTeal;
                     strip.ForeColor = Color.White;
-                    RecolourImageList(strip.ImageList);
+                    // Yellow reads well against the dark teal chrome
+                    RecolourImageList(strip.ImageList, YellowHue, 1f);
                     foreach (ToolStripItem item in strip.Items)
                     {
                         RestyleToolStripItem(item);
@@ -123,7 +124,8 @@ namespace ServiceBusExplorer.UIHelpers
                     break;
 
                 case TreeView treeView:
-                    RecolourImageList(treeView.ImageList);
+                    // Deep teal: dark enough to stay clear on the white tree background
+                    RecolourImageList(treeView.ImageList, DeepTeal.GetHue(), 0.45f);
                     break;
 
                 case Controls.Grouper grouper:
@@ -163,11 +165,11 @@ namespace ServiceBusExplorer.UIHelpers
                     }
                     if (Is(button.FlatAppearance.MouseOverBackColor, StockBorderBlue))
                     {
-                        button.FlatAppearance.MouseOverBackColor = Lime;
+                        button.FlatAppearance.MouseOverBackColor = Amber;
                     }
                     if (Is(button.FlatAppearance.MouseDownBackColor, StockBorderBlue))
                     {
-                        button.FlatAppearance.MouseDownBackColor = Lime;
+                        button.FlatAppearance.MouseDownBackColor = Amber;
                     }
                     break;
             }
@@ -178,7 +180,7 @@ namespace ServiceBusExplorer.UIHelpers
             item.ForeColor = Color.White;
             if (item.Image != null)
             {
-                item.Image = RecolourBlues(item.Image);
+                item.Image = RecolourBlues(item.Image, YellowHue, 1f);
             }
             if (item is ToolStripDropDownItem dropDownItem)
             {
@@ -189,9 +191,11 @@ namespace ServiceBusExplorer.UIHelpers
             }
         }
 
+        const float YellowHue = 60f;
+
         static readonly HashSet<ImageList> recolouredImageLists = new HashSet<ImageList>();
 
-        static void RecolourImageList(ImageList imageList)
+        static void RecolourImageList(ImageList imageList, float targetHue, float valueScale)
         {
             if (imageList == null || !recolouredImageLists.Add(imageList))
             {
@@ -199,15 +203,15 @@ namespace ServiceBusExplorer.UIHelpers
             }
             for (var i = 0; i < imageList.Images.Count; i++)
             {
-                imageList.Images[i] = RecolourBlues(imageList.Images[i]);
+                imageList.Images[i] = RecolourBlues(imageList.Images[i], targetHue, valueScale);
             }
         }
 
         /// <summary>
-        /// Remaps blue hues in an image to the Coral theme yellow, preserving each
-        /// pixel's saturation and brightness so shading survives.
+        /// Remaps blue hues in an image to the target hue, preserving each pixel's
+        /// saturation and (scaled) brightness so shading survives.
         /// </summary>
-        static Bitmap RecolourBlues(Image image)
+        static Bitmap RecolourBlues(Image image, float targetHue, float valueScale)
         {
             var bitmap = new Bitmap(image);
             for (var y = 0; y < bitmap.Height; y++)
@@ -222,7 +226,7 @@ namespace ServiceBusExplorer.UIHelpers
                     RgbToHsv(colour, out var hue, out var saturation, out var value);
                     if (saturation > 0.15f && hue >= 160f && hue <= 280f)
                     {
-                        bitmap.SetPixel(x, y, HsvToRgb(60f, saturation, value, colour.A));
+                        bitmap.SetPixel(x, y, HsvToRgb(targetHue, saturation, System.Math.Min(1f, value * valueScale), colour.A));
                     }
                 }
             }
