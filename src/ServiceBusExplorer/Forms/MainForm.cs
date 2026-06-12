@@ -334,12 +334,12 @@ namespace ServiceBusExplorer.Forms
                     WriteToLog(t.Exception.Message);
                 }
             });
-            // Coral: halve the log height and make the topic tree 20% narrower.
+            // Coral: halve the log height and make the topic tree 12% narrower.
             try
             {
                 var logHeight = mainSplitContainer.Height - mainSplitContainer.SplitterDistance - mainSplitContainer.SplitterWidth;
                 mainSplitContainer.SplitterDistance += logHeight / 2;
-                splitContainer.SplitterDistance = splitContainer.SplitterDistance * 4 / 5;
+                splitContainer.SplitterDistance = splitContainer.SplitterDistance * 88 / 100;
             }
             catch (InvalidOperationException)
             {

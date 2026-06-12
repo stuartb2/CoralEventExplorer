@@ -18,8 +18,8 @@ Saved connections are shared with stock SBE via the common user settings file
 |---|---|---|
 | Entity tree | Namespace root with Queues, Topics, Event Hubs, Notification Hubs and Relays | Topics only, with the Topics list as the tree root |
 | Tree navigation | Expand via +/− glyph | Single click expands; `previsesystems/events` opens automatically after connecting |
-| Loading messages | Messages button → receive dialog → peeks from the **front** (oldest) of the entity | Double-click a subscription to load its **newest** 50 messages instantly; an **◀ Older 50** button pages backwards in chronological order |
-| Message body | Shown as-is | A **Coral Payload** tab decodes the CloudEvents `data_base64` field and shows it as formatted JSON, kept in sync with the selected message |
+| Loading messages | Messages button → receive dialog → peeks from the **front** (oldest) of the entity | Double-click a subscription to load its **newest** 50 messages instantly; Shift+double-click does the same for its **dead-letter queue**; **◀ Older 50** buttons page backwards in chronological order |
+| Message body | Shown as-is | A **Coral Payload** tab (defaulting to half the view width) decodes the CloudEvents `data_base64` field and shows it as formatted, **foldable** JSON, kept in sync with the selected message |
 | Searching messages | SQL filter expression over properties; date filter | Additionally: a free-text search box that filters the visible messages to those whose body **or decoded payload** contains the text (incremental, case-insensitive, composes with the existing filters) |
 | Searching the payload | n/a | Find box on the Coral Payload tab highlights every match and Enter jumps to the next |
 | Message inspectors | "Select a BrokeredMessage inspector..." by default | `ZipBrokeredMessageInspector` pre-selected in every send/receive inspector dropdown, so gzip-compressed Coral messages decode transparently |
@@ -39,18 +39,22 @@ tree, since topics do not apply there.
 Service Bus can only peek forwards, so the fork locates a subscription's last sequence
 number with a handful of one-message probes (exponential search plus binary search — fast
 even on very deep backlogs), then peeks the page that ends there. Double-clicking a
-subscription node shows the newest page in chronological order (oldest at the top). Each
-press of **◀ Older 50** loads the page immediately preceding the oldest message shown and
-prepends it, so the grid grows upwards while staying in order. Partitioned topics fall back
-to the standard front peek, because their sequence numbers are per-partition.
+subscription node shows the newest page in chronological order (oldest at the top);
+Shift+double-clicking does the same for the subscription's dead-letter queue. Each press
+of **◀ Older 50** (available above both the messages and dead-letter lists) loads the page
+immediately preceding the oldest message shown and prepends it, so the grid grows upwards
+while staying in order. Partitioned topics fall back to the standard front peek, because
+their sequence numbers are per-partition.
 
 #### Coral Payload tab
-The right-hand side of the message views is a tab control: **Coral Payload** (default) and
-**Properties** (the stock system/custom property grids). The payload tab base64-decodes the
-top-level `data_base64` field of the message body, pretty-prints it as JSON with syntax
-highlighting, and offers its own Copy Body button and find-with-highlight box. Rendering is
-debounced and runs off the UI thread, so scrolling quickly through the message list stays
-fluid. Messages without a `data_base64` field simply show an empty payload panel.
+The right-hand side of the message views — defaulting to half the view's width — is a tab
+control: **Coral Payload** (default) and **Properties** (the stock system/custom property
+grids). The payload tab base64-decodes the top-level `data_base64` field of the message
+body and pretty-prints it as JSON with syntax highlighting; objects and arrays are
+**foldable** from the +/- gutter so uninteresting sections can be collapsed. It offers its
+own Copy Body button and a find-with-highlight box. Rendering is debounced and runs off
+the UI thread, so scrolling quickly through the message list stays fluid. Messages without
+a `data_base64` field simply show an empty payload panel.
 
 #### Body search
 Every message list (messages and dead-letter views of queues and subscriptions) has a

@@ -7,8 +7,9 @@
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net472</TargetFramework>
 		<ForceDesignerDPIUnaware>true</ForceDesignerDPIUnaware>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.1</AssemblyVersion>
+		<Version>1.1.0</Version>
+		<AssemblyVersion>1.1.0.0</AssemblyVersion>
+		<FileVersion>1.1.0.0</FileVersion>
 		<PublishUrl>publish\</PublishUrl>
 		<Install>true</Install>
 		<InstallFrom>Disk</InstallFrom>

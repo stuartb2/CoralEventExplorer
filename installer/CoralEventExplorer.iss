@@ -2,7 +2,7 @@
 ; Build the Release configuration first, then compile this script with ISCC.exe.
 
 #define MyAppName "Coral Event Explorer"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "Previse Systems"
 #define MyAppURL "https://github.com/stuartb2/CoralEventExplorer"
 #define MyAppExeName "CoralEventExplorer.exe"
