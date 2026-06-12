@@ -50,18 +50,16 @@ namespace ServiceBusExplorer.UIHelpers
         }
 
         /// <summary>
-        /// Adds a search box to a message list grouper header. The callback fires with the
-        /// trimmed search text when the user presses Enter, and with an empty string when
-        /// the box is cleared.
+        /// Adds a full-width search strip above a message list grouper. The callback fires
+        /// with the trimmed search text as the user types (debounced) and immediately on
+        /// Enter or when the box is cleared.
         /// </summary>
         internal static TextBox AddBodySearchBox(Controls.Grouper listGrouper, Action<string> applySearch)
         {
             var searchBox = new TextBox
             {
                 Name = "coralBodySearchBox_" + listGrouper.Name,
-                Location = new Point(152, 2),
-                Size = new Size(200, 20),
-                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                Dock = DockStyle.Fill,
                 Font = new Font("Microsoft Sans Serif", 8.25F)
             };
             SetCueBanner(searchBox, "Search message text...");
@@ -101,8 +99,19 @@ namespace ServiceBusExplorer.UIHelpers
                 debounceTimer.Start();
             };
             searchBox.Disposed += (s, e) => debounceTimer.Dispose();
-            listGrouper.Controls.Add(searchBox);
-            searchBox.BringToFront();
+
+            var searchPanel = new Panel
+            {
+                Name = "coralBodySearchPanel_" + listGrouper.Name,
+                Dock = DockStyle.Top,
+                Height = 26,
+                Padding = new Padding(0, 0, 0, 6),
+                BackColor = Color.Transparent
+            };
+            searchPanel.Controls.Add(searchBox);
+            var parent = listGrouper.Parent;
+            parent.Controls.Add(searchPanel);
+            listGrouper.BringToFront();
             return searchBox;
         }
 
@@ -245,8 +254,7 @@ namespace ServiceBusExplorer.UIHelpers
             var findBox = new TextBox
             {
                 Name = "coralPayloadFindBox_" + bodyTextBox.Name,
-                Size = new Size(168, 20),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Dock = DockStyle.Fill,
                 Font = new Font("Microsoft Sans Serif", 8.25F)
             };
             SetCueBanner(findBox, "Find in payload (Enter = next)");
@@ -294,19 +302,26 @@ namespace ServiceBusExplorer.UIHelpers
                 }
             };
             payloadTextBox.TextChanged += (s, e) => HighlightMatches();
-            payloadGrouper.Controls.Add(findBox);
-            findBox.BringToFront();
+
+            var findPanel = new Panel
+            {
+                Name = "coralPayloadFindPanel_" + bodyTextBox.Name,
+                Dock = DockStyle.Top,
+                Height = 26,
+                Padding = new Padding(0, 0, 0, 6),
+                BackColor = backColor
+            };
+            findPanel.Controls.Add(findBox);
 
             payloadGrouper.CustomPaint += e =>
-            {
                 CopyBodyButtonHelper.LayoutTextBoxWithCopyButton(payloadGrouper, payloadTextBox, copyButton);
-                findBox.Location = new Point(copyButton.Location.X - findBox.Width - 8, 6);
-            };
 
             parent.Controls.Remove(propertiesContainer);
             propertiesContainer.Dock = DockStyle.Fill;
             propertiesTabPage.Controls.Add(propertiesContainer);
             payloadTabPage.Controls.Add(payloadGrouper);
+            payloadTabPage.Controls.Add(findPanel);
+            payloadGrouper.BringToFront();
             tabControl.TabPages.Add(payloadTabPage);
             tabControl.TabPages.Add(propertiesTabPage);
             parent.Controls.Add(tabControl);
