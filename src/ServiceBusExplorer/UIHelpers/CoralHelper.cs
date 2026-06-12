@@ -64,7 +64,7 @@ namespace ServiceBusExplorer.UIHelpers
                 Anchor = AnchorStyles.Top | AnchorStyles.Left,
                 Font = new Font("Microsoft Sans Serif", 8.25F)
             };
-            SetCueBanner(searchBox, "Search message text (Enter)");
+            SetCueBanner(searchBox, "Search message text...");
             var lastApplied = string.Empty;
             void Apply()
             {
@@ -76,22 +76,31 @@ namespace ServiceBusExplorer.UIHelpers
                 lastApplied = text;
                 applySearch(text);
             }
+            // Search incrementally as the user types, debounced so a fast typist
+            // does not trigger a match computation per keystroke. Enter applies
+            // immediately.
+            var debounceTimer = new Timer { Interval = 300 };
+            debounceTimer.Tick += (s, e) =>
+            {
+                debounceTimer.Stop();
+                Apply();
+            };
             searchBox.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter)
                 {
                     e.Handled = true;
                     e.SuppressKeyPress = true;
+                    debounceTimer.Stop();
                     Apply();
                 }
             };
             searchBox.TextChanged += (s, e) =>
             {
-                if (searchBox.Text.Length == 0)
-                {
-                    Apply();
-                }
+                debounceTimer.Stop();
+                debounceTimer.Start();
             };
+            searchBox.Disposed += (s, e) => debounceTimer.Dispose();
             listGrouper.Controls.Add(searchBox);
             searchBox.BringToFront();
             return searchBox;
@@ -302,33 +311,68 @@ namespace ServiceBusExplorer.UIHelpers
             tabControl.TabPages.Add(propertiesTabPage);
             parent.Controls.Add(tabControl);
 
-            bodyTextBox.TextChanged += (s, e) => SetPayloadText(bodyTextBox.Text, payloadTextBox);
+            // Decoding and rendering the payload for every row is too slow when the user
+            // scrolls through the message list, so the update is debounced: the panel
+            // clears immediately, and the payload of the row the user settles on is
+            // decoded on a background thread and displayed shortly after.
+            var pendingBody = string.Empty;
+            var payloadDebounceTimer = new Timer { Interval = 200 };
+            payloadDebounceTimer.Tick += async (s, e) =>
+            {
+                payloadDebounceTimer.Stop();
+                var body = pendingBody;
+                string payloadText;
+                bool isJson;
+                try
+                {
+                    (payloadText, isJson) = await Task.Run(() => ComputePayload(body));
+                }
+                catch (Exception)
+                {
+                    payloadText = string.Empty;
+                    isJson = false;
+                }
+                if (!ReferenceEquals(body, pendingBody))
+                {
+                    return; // the user moved to another row while decoding
+                }
+                ApplyPayload(payloadTextBox, payloadText, isJson);
+            };
+            bodyTextBox.TextChanged += (s, e) =>
+            {
+                pendingBody = bodyTextBox.Text;
+                if (payloadTextBox.TextLength > 0)
+                {
+                    ApplyPayload(payloadTextBox, string.Empty, false);
+                }
+                payloadDebounceTimer.Stop();
+                payloadDebounceTimer.Start();
+            };
+            payloadTextBox.Disposed += (s, e) => payloadDebounceTimer.Dispose();
 
             return payloadTextBox;
         }
 
-        static void SetPayloadText(string messageBodyText, FastColoredTextBox payloadTextBox)
+        static (string text, bool isJson) ComputePayload(string messageBodyText)
         {
             var payload = TryExtractPayload(messageBodyText);
-
-            payloadTextBox.ClearStylesBuffer();
-            payloadTextBox.Range.ClearStyle(StyleIndex.All);
-
             if (payload == null)
             {
-                payloadTextBox.Language = Language.Custom;
-                payloadTextBox.Text = string.Empty;
+                return (string.Empty, false);
             }
-            else if (JsonSerializerHelper.IsJson(payload))
+            if (JsonSerializerHelper.IsJson(payload))
             {
-                payloadTextBox.Language = Language.JSON;
-                payloadTextBox.Text = JsonSerializerHelper.Indent(payload);
+                return (JsonSerializerHelper.Indent(payload), true);
             }
-            else
-            {
-                payloadTextBox.Language = Language.Custom;
-                payloadTextBox.Text = payload;
-            }
+            return (payload, false);
+        }
+
+        static void ApplyPayload(FastColoredTextBox payloadTextBox, string payloadText, bool isJson)
+        {
+            payloadTextBox.ClearStylesBuffer();
+            payloadTextBox.Range.ClearStyle(StyleIndex.All);
+            payloadTextBox.Language = isJson ? Language.JSON : Language.Custom;
+            payloadTextBox.Text = payloadText;
         }
 
         static string TryExtractPayload(string messageBodyText)
