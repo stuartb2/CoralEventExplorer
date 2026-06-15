@@ -1,0 +1,74 @@
+# Builds Coral Event Explorer, compiles the installer and publishes a GitHub
+# release. Triggered manually (Actions -> "GitHub - build and publish release"
+# -> Run workflow) with a version number. Replaces the local release loop.
+name: GitHub - build and publish release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, e.g. 1.2.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build installer and publish release
+    runs-on: windows-2022
+    steps:
+      - name: Git configuration
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - name: Restore NuGet packages
+        run: dotnet restore src/ServiceBusExplorer.sln
+
+      - name: Build Release
+        run: >-
+          dotnet build src/ServiceBusExplorer/ServiceBusExplorer.csproj
+          -c Release
+          -p:Version=${{ inputs.version }}
+          -p:FileVersion=${{ inputs.version }}.0
+          -p:AssemblyVersion=${{ inputs.version }}.0
+
+      - name: Verify built file version
+        shell: pwsh
+        run: |
+          $exe = "src/ServiceBusExplorer/bin/Release/CoralEventExplorer.exe"
+          $fv = (Get-Item $exe).VersionInfo.FileVersion
+          Write-Host "Built file version: $fv"
+          if ($fv -ne "${{ inputs.version }}.0") { throw "File version $fv does not match ${{ inputs.version }}.0" }
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: >-
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          /DMyAppVersion=${{ inputs.version }}
+          installer\CoralEventExplorer.iss
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $staging = "staging"
+          Copy-Item src/ServiceBusExplorer/bin/Release $staging -Recurse
+          Get-ChildItem $staging -Recurse -Include *.pdb,*.xml | Remove-Item -Force
+          Compress-Archive -Path "$staging/*" -DestinationPath CoralEventExplorer.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: >-
+          gh release create coral-v${{ inputs.version }}
+          --title "Coral Event Explorer ${{ inputs.version }}"
+          --notes "Automated release ${{ inputs.version }}. See CORAL.md for the list of features."
+          --target ${{ github.ref_name }}
+          "installer/Output/CoralEventExplorerSetup-${{ inputs.version }}.exe"
+          "CoralEventExplorer.zip"

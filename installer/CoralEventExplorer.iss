@@ -2,7 +2,10 @@
 ; Build the Release configuration first, then compile this script with ISCC.exe.
 
 #define MyAppName "Coral Event Explorer"
-#define MyAppVersion "1.1.0"
+; Default version; the github-release workflow overrides it with ISCC /DMyAppVersion=x.y.z
+#ifndef MyAppVersion
+  #define MyAppVersion "1.1.0"
+#endif
 #define MyAppPublisher "Previse Systems"
 #define MyAppURL "https://github.com/stuartb2/CoralEventExplorer"
 #define MyAppExeName "CoralEventExplorer.exe"
