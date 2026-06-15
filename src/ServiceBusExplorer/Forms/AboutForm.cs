@@ -214,6 +214,7 @@ namespace ServiceBusExplorer.Forms
         private void AboutForm_Load(object sender, EventArgs e)
         {
             Text = $"About {MainForm.SingletonMainForm.Text}";
+            label2.Text = "Coral Event Explorer"; // product heading above the version
             lblExeVersion.Text = VersionProvider.GetExeVersion();
             lblClientVersion.Text = VersionProvider.GetServiceBusClientVersion();
 
