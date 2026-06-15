@@ -18,6 +18,11 @@ AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
+; Detect a running instance (the app holds a mutex of this name) and close it
+; before installing, so an in-place upgrade reliably replaces the executable.
+AppMutex=CoralEventExplorerMutex
+CloseApplications=yes
+RestartApplications=no
 ; Per-user install: no admin rights needed and the application can update its
 ; own configuration file next to the executable.
 PrivilegesRequired=lowest

@@ -40,6 +40,12 @@ namespace ServiceBusExplorer
         //***************************
         private const string ExceptionFormat = "Exception: {0}";
         private const string InnerExceptionFormat = "InnerException: {0}";
+
+        // Coral: a named mutex held for the process lifetime so the installer (via its
+        // AppMutex setting of the same name) can detect a running instance and close it
+        // before replacing files during an upgrade.
+        private const string AppMutexName = "CoralEventExplorerMutex";
+        private static Mutex appMutex;
         #endregion
         
         #region Static Main Method
@@ -49,6 +55,11 @@ namespace ServiceBusExplorer
         [STAThread]
         static void Main(string[] args)
         {
+            // Create (but do not require ownership of) the app mutex so the installer
+            // can detect a running instance during an upgrade. Kept alive for the
+            // process lifetime via the static field.
+            appMutex = new Mutex(false, AppMutexName);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.ThreadException += Application_ThreadException;
