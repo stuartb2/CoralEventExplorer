@@ -218,6 +218,9 @@ namespace ServiceBusExplorer.Controls
             CoralHelper.AttachPayloadTab(messagePropertiesSplitContainer, txtMessageText);
             CoralHelper.AttachPayloadTab(deadletterPropertiesSplitContainer, txtDeadletterText);
 
+            CoralHexView.AttachHexViewMenuItem(messagesContextMenuStrip, () => brokeredMessage);
+            CoralHexView.AttachHexViewMenuItem(deadletterContextMenuStrip, () => deadletterMessage);
+
             var messagesSearchBox = CoralHelper.AddBodySearchBox(grouperMessageList, async text =>
             {
                 try
