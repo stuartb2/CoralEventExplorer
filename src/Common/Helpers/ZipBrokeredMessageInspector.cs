@@ -50,7 +50,14 @@ namespace ServiceBusExplorer.Helpers
 
         public BrokeredMessage AfterReceiveMessage(BrokeredMessage message)
         {
-            var stream = message?.Clone().GetBody<Stream>();
+            if (message == null)
+            {
+                return null;
+            }
+            // Coral: capture the raw compressed bytes (what came off the wire) before
+            // decompressing, so the hex viewer can show the on-the-wire payload.
+            CaptureRawBody(message);
+            var stream = message.Clone().GetBody<Stream>();
             if (stream == null)
             {
                 return null;
@@ -61,7 +68,36 @@ namespace ServiceBusExplorer.Helpers
             }
             message.SetBodyStream(Decompress(stream));
             return message;
-        } 
+        }
+        #endregion
+
+        #region Coral Raw-Body Capture
+        private static void CaptureRawBody(BrokeredMessage message)
+        {
+            try
+            {
+                using (var raw = message.Clone().GetBody<Stream>())
+                {
+                    if (raw == null)
+                    {
+                        return;
+                    }
+                    if (raw.CanSeek)
+                    {
+                        raw.Seek(0, SeekOrigin.Begin);
+                    }
+                    using (var memoryStream = new MemoryStream())
+                    {
+                        raw.CopyTo(memoryStream);
+                        CoralRawBodyCache.Store(message, memoryStream.ToArray());
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Capturing the raw body is best-effort; never disrupt message receipt.
+            }
+        }
         #endregion
 
         #region IDisposable Methods

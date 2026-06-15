@@ -1,9 +1,11 @@
 #region Using Directives
 
 using Microsoft.ServiceBus.Messaging;
+using ServiceBusExplorer.Helpers;
 using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
@@ -45,28 +47,42 @@ namespace ServiceBusExplorer.UIHelpers
                 return;
             }
 
-            var bytes = GetRawBody(message);
-            if (bytes == null)
+            // The body currently held by the message (post-inspector — i.e. decompressed).
+            var decompressed = GetRawBody(message);
+            // The bytes captured off the wire before the ZIP inspector decompressed.
+            CoralRawBodyCache.TryGet(message, out var wire);
+
+            if (decompressed == null && wire == null)
             {
-                MessageBox.Show("The raw body of this message could not be read.", "View Raw (Hex)",
+                MessageBox.Show("The body of this message could not be read.", "View Raw (Hex)",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            var title = $"Raw message (Hex) - {bytes.Length} bytes";
-            if (!string.IsNullOrEmpty(SafeMessageId(message)))
-            {
-                title += $" - {SafeMessageId(message)}";
-            }
+            // Default to the on-the-wire (compressed) bytes when available.
+            var hasWire = wire != null;
+            var actuallyCompressed = hasWire && decompressed != null && !BytesEqual(wire, decompressed);
+            var idSuffix = string.IsNullOrEmpty(SafeMessageId(message)) ? "" : $" - {SafeMessageId(message)}";
 
             var form = new Form
             {
-                Text = title,
                 Width = 760,
                 Height = 540,
                 StartPosition = FormStartPosition.CenterScreen,
                 ShowIcon = true
             };
+
+            var header = new Panel { Dock = DockStyle.Top, Height = 28 };
+            var showDecompressed = new CheckBox
+            {
+                Text = "Show decompressed body",
+                AutoSize = true,
+                Location = new Point(8, 5),
+                Checked = false,
+                Visible = actuallyCompressed
+            };
+            header.Controls.Add(showDecompressed);
+
             var textBox = new TextBox
             {
                 Multiline = true,
@@ -75,13 +91,34 @@ namespace ServiceBusExplorer.UIHelpers
                 ScrollBars = ScrollBars.Both,
                 WordWrap = false,
                 BackColor = SystemColors.Window,
-                Font = new Font("Consolas", 9.75F),
-                Text = BuildHexDump(bytes)
+                Font = new Font("Consolas", 9.75F)
             };
+
+            void Render()
+            {
+                var decompress = showDecompressed.Checked;
+                var bytes = decompress ? decompressed : (wire ?? decompressed);
+                var label = decompress
+                    ? "decompressed body"
+                    : (hasWire ? "compressed (off the wire)" : "body");
+                form.Text = $"Raw message (Hex) - {label} - {bytes.Length} bytes{idSuffix}";
+                textBox.Text = BuildHexDump(bytes);
+                textBox.Select(0, 0);
+            }
+            showDecompressed.CheckedChanged += (s, e) => Render();
+
             form.Controls.Add(textBox);
+            form.Controls.Add(header);
             CoralTheme.Apply(form);
-            textBox.Select(0, 0);
+            Render();
             form.Show();
+        }
+
+        static bool BytesEqual(byte[] a, byte[] b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a == null || b == null || a.Length != b.Length) return false;
+            return a.SequenceEqual(b);
         }
 
         static string SafeMessageId(BrokeredMessage message)
