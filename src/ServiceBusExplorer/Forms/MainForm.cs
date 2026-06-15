@@ -161,6 +161,9 @@ namespace ServiceBusExplorer.Forms
         private static readonly string DefaultExpandTopicPath =
             ConfigurationManager.AppSettings["defaultExpandTopicPath"] ?? "previsesystems/events";
 
+        // Coral: the running build's file version, stamped into the title bar and log.
+        private string coralVersion;
+
         private const string FilteredSubscriptionEntities = "Subscriptions (Filtered)";
         private const string RuleEntities = "Rules";
         private const string QueueEntity = "Queue";
@@ -285,6 +288,19 @@ namespace ServiceBusExplorer.Forms
             InitializeComponent();
             UIHelpers.CoralTheme.Apply(this);
             panelMain.ControlAdded += (s, e) => UIHelpers.CoralTheme.Apply(e.Control);
+            // Coral: make the running build obvious for support. Stamp the version into
+            // the title bar and log the version and executable path at startup.
+            try
+            {
+                var exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                coralVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath).FileVersion;
+                Text = $"Coral Event Explorer {coralVersion}";
+                WriteToLog($"Coral Event Explorer version {coralVersion} running from {exePath}");
+            }
+            catch (Exception)
+            {
+                // Non-fatal: version stamping is diagnostic only.
+            }
             // Coral: expand tree nodes on a single click instead of requiring the +.
             // Hit-test so clicks on the +/- glyph keep their normal toggle behaviour.
             serviceBusTreeView.NodeMouseClick += (s, e) =>
@@ -4459,7 +4475,9 @@ namespace ServiceBusExplorer.Forms
 
         private void SetTitle(string prefix, string explorer)
         {
-            this.Text = $"{prefix} - Coral Event Explorer";
+            this.Text = string.IsNullOrEmpty(coralVersion)
+                ? $"{prefix} - Coral Event Explorer"
+                : $"{prefix} - Coral Event Explorer {coralVersion}";
         }
 
         #endregion

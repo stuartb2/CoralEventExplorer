@@ -77,6 +77,7 @@ namespace ServiceBusExplorer.Forms
 
         private void NewVersionAvailableForm_Load(object sender, EventArgs e)
         {
+            label2.Text = "Coral Event Explorer"; // product heading (was "Service Bus Explorer")
             lblExeVersion.Text = VersionProvider.GetExeVersion();
             
             if (!VersionProvider.IsLatestVersion(out var releaseInfo))
