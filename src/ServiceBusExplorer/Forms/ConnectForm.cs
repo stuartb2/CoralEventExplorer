@@ -1105,16 +1105,19 @@ namespace ServiceBusExplorer.Forms
             cboServiceBusNamespace.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
             cboServiceBusNamespace.DrawItem += cboServiceBusNamespace_DrawItem;
 
+            // Position/anchor relative to the Delete button so it scales with DPI and
+            // sits on the same button row regardless of display scaling.
             btnCoralPin = new System.Windows.Forms.Button
             {
                 Name = "btnCoralPin",
                 Text = "Pin",
-                Size = new System.Drawing.Size(72, 23),
-                Location = new System.Drawing.Point(172, 443),
+                Size = btnDelete.Size,
+                Location = new System.Drawing.Point(btnDelete.Right + 6, btnDelete.Top),
+                Anchor = btnDelete.Anchor,
                 FlatStyle = System.Windows.Forms.FlatStyle.Flat,
                 BackColor = System.Drawing.Color.FromArgb(215, 228, 242),
                 ForeColor = System.Drawing.SystemColors.ControlText,
-                Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F),
+                Font = btnDelete.Font,
                 Visible = false
             };
             btnCoralPin.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(153, 180, 209);
