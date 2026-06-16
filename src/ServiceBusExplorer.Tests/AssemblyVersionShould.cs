@@ -15,7 +15,11 @@ namespace ServiceBusExplorer.Tests
         [Fact]
         public void BeSameAsSetInProject()
         {
+            // Coral fork: the main assembly was renamed ServiceBusExplorer.exe ->
+            // CoralEventExplorer.exe, so include it alongside the ServiceBus* libraries
+            // to keep the expected count of 9.
             var assemblyNames = Directory.GetFiles(".", "ServiceBus*.*")
+                    .Concat(Directory.GetFiles(".", "CoralEventExplorer*.*"))
                     .Where(x=>x.EndsWith(".dll") || x.EndsWith(".exe"));
 
             var projectFiles = Directory.GetFiles("../../../../", $"*{CSharpProjectExtension}", SearchOption.AllDirectories);
