@@ -106,7 +106,6 @@ namespace ServiceBusExplorer.Forms
         // Coral: pinned/recent connection support.
         private System.Collections.Generic.HashSet<string> coralPinned = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private System.Collections.Generic.HashSet<string> coralRecent = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private System.Windows.Forms.Button btnCoralPin;
 
         #endregion
 
@@ -1100,37 +1099,31 @@ namespace ServiceBusExplorer.Forms
 
         #region Coral pinned/recent connections
 
+        private System.Windows.Forms.ToolStripMenuItem coralPinMenuItem;
+
         private void CoralSetupConnectionList()
         {
             cboServiceBusNamespace.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
             cboServiceBusNamespace.DrawItem += cboServiceBusNamespace_DrawItem;
 
-            // Place the pin toggle next to the namespace dropdown, in the always-visible
-            // top area. The dialog's bottom button row can be clipped off-screen on
-            // high-DPI / short displays, so the top is the reliable home for it.
-            const int pinWidth = 56;
-            cboServiceBusNamespace.DropDownWidth = cboServiceBusNamespace.Width;
-            cboServiceBusNamespace.Width -= (pinWidth + 6);
-            btnCoralPin = new System.Windows.Forms.Button
+            // Pin/unpin via right-click on the namespace dropdown — always accessible,
+            // regardless of window size or display scaling.
+            var menu = new System.Windows.Forms.ContextMenuStrip();
+            coralPinMenuItem = new System.Windows.Forms.ToolStripMenuItem("Pin to top");
+            coralPinMenuItem.Click += coralPinMenuItem_Click;
+            menu.Items.Add(coralPinMenuItem);
+            menu.Opening += (s, e) =>
             {
-                Name = "btnCoralPin",
-                Text = "Pin",
-                Size = new System.Drawing.Size(pinWidth, cboServiceBusNamespace.Height),
-                Location = new System.Drawing.Point(cboServiceBusNamespace.Right + 6, cboServiceBusNamespace.Top),
-                Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left,
-                FlatStyle = System.Windows.Forms.FlatStyle.Flat,
-                BackColor = System.Drawing.Color.FromArgb(215, 228, 242),
-                ForeColor = System.Drawing.SystemColors.ControlText,
-                Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F),
-                Visible = false
+                if (!CoralIsSavedConnectionSelected())
+                {
+                    e.Cancel = true;
+                    return;
+                }
+                coralPinMenuItem.Text = coralPinned.Contains(cboServiceBusNamespace.Text)
+                    ? "Unpin from top"
+                    : "Pin to top";
             };
-            btnCoralPin.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(153, 180, 209);
-            btnCoralPin.Click += btnCoralPin_Click;
-            Controls.Add(btnCoralPin);
-            btnCoralPin.BringToFront();
-
-            cboServiceBusNamespace.SelectedIndexChanged += (s, e) => UpdateCoralPinButton();
-            UpdateCoralPinButton();
+            cboServiceBusNamespace.ContextMenuStrip = menu;
         }
 
         private bool CoralIsSavedConnectionSelected()
@@ -1140,18 +1133,7 @@ namespace ServiceBusExplorer.Forms
                    serviceBusHelper.ServiceBusNamespaces.ContainsKey(cboServiceBusNamespace.Text);
         }
 
-        private void UpdateCoralPinButton()
-        {
-            if (btnCoralPin == null)
-            {
-                return;
-            }
-            var saved = CoralIsSavedConnectionSelected();
-            btnCoralPin.Visible = saved;
-            btnCoralPin.Text = saved && coralPinned.Contains(cboServiceBusNamespace.Text) ? "Unpin" : "Pin";
-        }
-
-        private void btnCoralPin_Click(object sender, EventArgs e)
+        private void coralPinMenuItem_Click(object sender, EventArgs e)
         {
             if (!CoralIsSavedConnectionSelected())
             {
@@ -1177,7 +1159,6 @@ namespace ServiceBusExplorer.Forms
             cboServiceBusNamespace.SelectedIndex = index >= 0 ? index : 0;
             ignoreSelectedIndexChange = false;
             cboServiceBusNamespace_SelectedIndexChanged(cboServiceBusNamespace, EventArgs.Empty);
-            UpdateCoralPinButton();
         }
 
         private void cboServiceBusNamespace_DrawItem(object sender, System.Windows.Forms.DrawItemEventArgs e)
