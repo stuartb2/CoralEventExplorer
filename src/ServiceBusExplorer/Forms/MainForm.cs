@@ -520,23 +520,38 @@ namespace ServiceBusExplorer.Forms
                 Keys.Control | Keys.D5
             };
 
-            foreach (var namespaceKey in serviceBusHelper.ServiceBusNamespaces.Keys.OrderBy(k => k))
+            var userKeys = serviceBusHelper.ServiceBusNamespaces.Keys
+                .Where(k => serviceBusHelper.ServiceBusNamespaces[k].UserCreated)
+                .ToList();
+
+            // Coral: pinned favourites first, then recently used, then the rest
+            // alphabetically. Pinned/recent lists are persisted in the config file.
+            var ordered = UIHelpers.CoralConnectionList.Order(userKeys, configFileUse);
+
+            foreach (var namespaceKey in ordered.Keys)
             {
-                if (serviceBusHelper.ServiceBusNamespaces[namespaceKey].UserCreated)
+                var shortcutKey = allowedShortCutKeys.Count > 0 ? allowedShortCutKeys.First() : Keys.None;
+                if (allowedShortCutKeys.Count > 0) allowedShortCutKeys.RemoveAt(0);
+
+                var menuItem = new ToolStripMenuItem
                 {
-                    var shortcutKey = allowedShortCutKeys.Count > 0 ? allowedShortCutKeys.First() : Keys.None;
-                    if (allowedShortCutKeys.Count > 0) allowedShortCutKeys.RemoveAt(0);
-
-                    var menuItem = new ToolStripMenuItem
-                    {
-                        Text = namespaceKey,
-                        ShortcutKeys = shortcutKey,
-                        Tag = namespaceKey
-                    };
-                    menuItem.Click += SavedConnectionToolStripMenuItem_Click;
-
-                    savedConnectionsToolStripMenuItem.DropDownItems.Add(menuItem);
+                    Text = namespaceKey,
+                    ShortcutKeys = shortcutKey,
+                    Tag = namespaceKey,
+                    ToolTipText = "Right-click to pin or unpin this connection."
+                };
+                if (ordered.Pinned.Contains(namespaceKey))
+                {
+                    menuItem.Image = CoralConnectionDot(System.Drawing.Color.Goldenrod);
                 }
+                else if (ordered.Recent.Contains(namespaceKey))
+                {
+                    menuItem.Image = CoralConnectionDot(System.Drawing.Color.Gray);
+                }
+                menuItem.Click += SavedConnectionToolStripMenuItem_Click;
+                menuItem.MouseUp += SavedConnectionMenuItem_MouseUp;
+
+                savedConnectionsToolStripMenuItem.DropDownItems.Add(menuItem);
             }
 
             if (savedConnectionsToolStripMenuItem.DropDownItems.Count > 0)
@@ -545,10 +560,46 @@ namespace ServiceBusExplorer.Forms
             }
         }
 
+        // Coral: a small colour dot used to mark pinned/recent saved connections.
+        private static System.Drawing.Image CoralConnectionDot(System.Drawing.Color color)
+        {
+            var bmp = new System.Drawing.Bitmap(12, 12);
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (var brush = new System.Drawing.SolidBrush(color))
+                {
+                    g.FillEllipse(brush, 2, 2, 8, 8);
+                }
+            }
+            return bmp;
+        }
+
+        // Coral: right-click a saved connection to pin/unpin it (left-click still connects).
+        private void SavedConnectionMenuItem_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right)
+            {
+                return;
+            }
+            var key = (sender as ToolStripMenuItem)?.Tag?.ToString();
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+            UIHelpers.CoralConnectionList.TogglePin(configFileUse, key);
+            UpdateSavedConnectionsMenu();
+            savedConnectionsToolStripMenuItem.ShowDropDown();
+        }
+
         private async void SavedConnectionToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var serviceBusNamespace = serviceBusHelper.ServiceBusNamespaces[(sender as ToolStripMenuItem).Tag.ToString()];
+            var key = (sender as ToolStripMenuItem).Tag.ToString();
+            var serviceBusNamespace = serviceBusHelper.ServiceBusNamespaces[key];
             serviceBusHelper.Connect(serviceBusNamespace);
+            // Coral: remember this as the most-recently-used connection.
+            UIHelpers.CoralConnectionList.RecordRecent(configFileUse, key);
+            UpdateSavedConnectionsMenu();
             SetTitle(serviceBusNamespace.Namespace, "Service Bus");
 
             foreach (var userControl in panelMain.Controls.OfType<UserControl>())
