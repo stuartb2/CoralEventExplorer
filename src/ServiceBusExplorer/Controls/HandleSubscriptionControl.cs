@@ -336,22 +336,41 @@ namespace ServiceBusExplorer.Controls
 
         #region Coral tail paging
 
-        MessageReceiver CreateMessagesPeekReceiver()
+        // Peeking abstraction: the main subscription is peeked via a SubscriptionClient
+        // (which works for session-enabled subscriptions, where a plain MessageReceiver
+        // cannot be created); the dead-letter sub-queue is peeked via a MessageReceiver
+        // on the dead-letter path. Both expose the same two peek operations.
+        sealed class MessagePeeker
         {
-            return serviceBusHelper.MessagingFactory.CreateMessageReceiver(
-                SubscriptionClient.FormatSubscriptionPath(
-                    subscriptionWrapper.SubscriptionDescription.TopicPath,
-                    subscriptionWrapper.SubscriptionDescription.Name),
-                ReceiveMode.PeekLock);
+            public Func<long, int, IEnumerable<BrokeredMessage>> PeekFrom;
+            public Func<int, IEnumerable<BrokeredMessage>> PeekNext;
         }
 
-        MessageReceiver CreateDeadletterPeekReceiver()
+        MessagePeeker CreateMessagesPeeker()
         {
-            return serviceBusHelper.MessagingFactory.CreateMessageReceiver(
+            var client = serviceBusHelper.MessagingFactory.CreateSubscriptionClient(
+                subscriptionWrapper.SubscriptionDescription.TopicPath,
+                subscriptionWrapper.SubscriptionDescription.Name,
+                ReceiveMode.PeekLock);
+            return new MessagePeeker
+            {
+                PeekFrom = (sequence, batch) => client.PeekBatch(sequence, batch),
+                PeekNext = batch => client.PeekBatch(batch)
+            };
+        }
+
+        MessagePeeker CreateDeadletterPeeker()
+        {
+            var receiver = serviceBusHelper.MessagingFactory.CreateMessageReceiver(
                 SubscriptionClient.FormatDeadLetterPath(
                     subscriptionWrapper.SubscriptionDescription.TopicPath,
                     subscriptionWrapper.SubscriptionDescription.Name),
                 ReceiveMode.PeekLock);
+            return new MessagePeeker
+            {
+                PeekFrom = (sequence, batch) => receiver.PeekBatch(sequence, batch),
+                PeekNext = batch => receiver.PeekBatch(batch)
+            };
         }
 
         IBrokeredMessageInspector CreateDefaultInspector()
@@ -380,7 +399,7 @@ namespace ServiceBusExplorer.Controls
                     ReadMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
                     return;
                 }
-                var page = PeekNewestPage(CreateMessagesPeekReceiver, count);
+                var page = PeekNewestPage(CreateMessagesPeeker, count);
                 ShowTailPage(page, replace: true);
             }
             catch (Exception ex)
@@ -418,8 +437,7 @@ namespace ServiceBusExplorer.Controls
                     return;
                 }
                 Cursor.Current = Cursors.WaitCursor;
-                var receiver = CreateMessagesPeekReceiver();
-                var page = PeekPageEndingAt(receiver, count, oldestShown - 1);
+                var page = PeekPageEndingAt(CreateMessagesPeeker(), count, oldestShown - 1);
                 ShowTailPage(page, replace: false);
             }
             catch (Exception ex)
@@ -436,30 +454,30 @@ namespace ServiceBusExplorer.Controls
         // for deep backlogs, and falls back to a forward scan when the probe yields
         // nothing (e.g. a subscription with a single message, where peeking by sequence
         // number can come back empty). receiverFactory supplies a fresh peek receiver.
-        List<BrokeredMessage> PeekNewestPage(Func<MessageReceiver> receiverFactory, int count)
+        List<BrokeredMessage> PeekNewestPage(Func<MessagePeeker> peekerFactory, int count)
         {
-            var lastSequence = FindLastSequenceNumber(receiverFactory());
+            var lastSequence = FindLastSequenceNumber(peekerFactory());
             if (lastSequence != null)
             {
-                var page = PeekPageEndingAt(receiverFactory(), count, lastSequence);
+                var page = PeekPageEndingAt(peekerFactory(), count, lastSequence);
                 if (page.Count > 0)
                 {
                     return page;
                 }
             }
-            return ScanNewest(receiverFactory(), count);
+            return ScanNewest(peekerFactory(), count);
         }
 
         // Reliable fallback: peek forward from the front, keeping only the newest
         // `count` messages. Bounded by the message count, so it is used only when the
         // probe path returns nothing (typically very small subscriptions).
-        List<BrokeredMessage> ScanNewest(MessageReceiver receiver, int count)
+        List<BrokeredMessage> ScanNewest(MessagePeeker peeker, int count)
         {
             var inspector = CreateDefaultInspector();
             var window = new List<BrokeredMessage>();
             while (true)
             {
-                var batch = receiver.PeekBatch(Math.Max(count, 100))?.ToList();
+                var batch = peeker.PeekNext(Math.Max(count, 100))?.ToList();
                 if (batch == null || batch.Count == 0)
                 {
                     break;
@@ -475,17 +493,17 @@ namespace ServiceBusExplorer.Controls
                 .ToList();
         }
 
-        static long? PeekSequenceAtOrAfter(MessageReceiver receiver, long fromSequence)
+        static long? PeekSequenceAtOrAfter(MessagePeeker peeker, long fromSequence)
         {
-            var messages = receiver.PeekBatch(fromSequence, 1);
+            var messages = peeker.PeekFrom(fromSequence, 1);
             return messages?.FirstOrDefault()?.SequenceNumber;
         }
 
         // Finds the sequence number of the newest message via exponential probing
         // followed by a binary search; costs O(log n) one-message peeks.
-        static long? FindLastSequenceNumber(MessageReceiver receiver)
+        static long? FindLastSequenceNumber(MessagePeeker peeker)
         {
-            var first = PeekSequenceAtOrAfter(receiver, 0);
+            var first = PeekSequenceAtOrAfter(peeker, 0);
             if (first == null)
             {
                 return null;
@@ -494,7 +512,7 @@ namespace ServiceBusExplorer.Controls
             long step = 1;
             while (true)
             {
-                var next = PeekSequenceAtOrAfter(receiver, known + step);
+                var next = PeekSequenceAtOrAfter(peeker, known + step);
                 // Stop when no message exists at/after the probe point. The
                 // "<= known" guard also stops if a peek fails to honour the start
                 // sequence and re-returns an earlier message, preventing a hang.
@@ -513,7 +531,7 @@ namespace ServiceBusExplorer.Controls
             while (hi - lo > 1)
             {
                 var mid = lo + (hi - lo) / 2;
-                var found = PeekSequenceAtOrAfter(receiver, mid);
+                var found = PeekSequenceAtOrAfter(peeker, mid);
                 if (found != null && found.Value >= mid)
                 {
                     lo = found.Value;
@@ -529,7 +547,7 @@ namespace ServiceBusExplorer.Controls
         // Returns up to count messages with sequence numbers up to and including
         // endSequence, in ascending order: the page that ends at endSequence. Widens
         // the scanned window when sequence numbers are sparse.
-        List<BrokeredMessage> PeekPageEndingAt(MessageReceiver receiver, int count, long? endSequence)
+        List<BrokeredMessage> PeekPageEndingAt(MessagePeeker peeker, int count, long? endSequence)
         {
             var page = new List<BrokeredMessage>();
             if (endSequence == null)
@@ -543,7 +561,7 @@ namespace ServiceBusExplorer.Controls
                 {
                     windowStart = 0;
                 }
-                page = PeekRange(receiver, windowStart, endSequence.Value);
+                page = PeekRange(peeker, windowStart, endSequence.Value);
                 if (page.Count >= count || windowStart == 0)
                 {
                     break;
@@ -559,14 +577,14 @@ namespace ServiceBusExplorer.Controls
         }
 
         // Peeks every message with a sequence number in [fromSequence, toSequence].
-        List<BrokeredMessage> PeekRange(MessageReceiver receiver, long fromSequence, long toSequence)
+        List<BrokeredMessage> PeekRange(MessagePeeker peeker, long fromSequence, long toSequence)
         {
             var inspector = CreateDefaultInspector();
             var result = new List<BrokeredMessage>();
             var next = fromSequence;
             while (next <= toSequence)
             {
-                var batch = receiver.PeekBatch(next, 200)?.ToList();
+                var batch = peeker.PeekFrom(next, 200)?.ToList();
                 if (batch == null || batch.Count == 0)
                 {
                     break;
@@ -635,7 +653,7 @@ namespace ServiceBusExplorer.Controls
                     ReadDeadletterMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
                     return;
                 }
-                var page = PeekNewestPage(CreateDeadletterPeekReceiver, count);
+                var page = PeekNewestPage(CreateDeadletterPeeker, count);
                 ShowDeadletterTailPage(page, replace: true);
             }
             catch (Exception ex)
@@ -673,8 +691,7 @@ namespace ServiceBusExplorer.Controls
                     return;
                 }
                 Cursor.Current = Cursors.WaitCursor;
-                var receiver = CreateDeadletterPeekReceiver();
-                var page = PeekPageEndingAt(receiver, count, oldestShown - 1);
+                var page = PeekPageEndingAt(CreateDeadletterPeeker(), count, oldestShown - 1);
                 ShowDeadletterTailPage(page, replace: false);
             }
             catch (Exception ex)
