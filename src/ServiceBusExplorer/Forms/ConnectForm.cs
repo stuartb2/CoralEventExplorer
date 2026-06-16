@@ -1003,13 +1003,8 @@ namespace ServiceBusExplorer.Forms
 
                 serviceBusHelper.ServiceBusNamespaces[key] = ServiceBusNamespace.GetServiceBusNamespace(key, value, MainForm.StaticWriteToLog);
 
-                cboServiceBusNamespace.Items.Clear();
-                cboServiceBusNamespace.Items.Add(SelectServiceBusNamespace);
-                cboServiceBusNamespace.Items.Add(EnterConnectionString);
-
-                // ReSharper disable once CoVariantArrayConversion
-                cboServiceBusNamespace.Items.AddRange(serviceBusHelper.ServiceBusNamespaces.Keys.OrderBy(s => s).ToArray());
-                cboServiceBusNamespace.Text = key;
+                // Coral: keep pinned/recent ordering when the list is rebuilt after a save.
+                CoralRepopulate(key);
             }
             catch (Exception ex)
             {
@@ -1100,6 +1095,7 @@ namespace ServiceBusExplorer.Forms
         #region Coral pinned/recent connections
 
         private System.Windows.Forms.ToolStripMenuItem coralPinMenuItem;
+        private System.Windows.Forms.ContextMenuStrip coralConnectionMenu;
 
         private void CoralSetupConnectionList()
         {
@@ -1108,22 +1104,29 @@ namespace ServiceBusExplorer.Forms
 
             // Pin/unpin via right-click on the namespace dropdown — always accessible,
             // regardless of window size or display scaling.
-            var menu = new System.Windows.Forms.ContextMenuStrip();
+            coralConnectionMenu = new System.Windows.Forms.ContextMenuStrip();
             coralPinMenuItem = new System.Windows.Forms.ToolStripMenuItem("Pin to top");
             coralPinMenuItem.Click += coralPinMenuItem_Click;
-            menu.Items.Add(coralPinMenuItem);
-            menu.Opening += (s, e) =>
+            coralConnectionMenu.Items.Add(coralPinMenuItem);
+
+            // A ComboBox ignores its ContextMenuStrip property on right-click (a
+            // long-standing WinForms quirk — the combo swallows WM_CONTEXTMENU), so we
+            // show the menu manually from MouseUp instead.
+            cboServiceBusNamespace.MouseUp += cboServiceBusNamespace_MouseUp;
+            toolTip.SetToolTip(cboServiceBusNamespace,
+                "Right-click to pin or unpin the selected connection.");
+        }
+
+        private void cboServiceBusNamespace_MouseUp(object sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (e.Button != System.Windows.Forms.MouseButtons.Right || !CoralIsSavedConnectionSelected())
             {
-                if (!CoralIsSavedConnectionSelected())
-                {
-                    e.Cancel = true;
-                    return;
-                }
-                coralPinMenuItem.Text = coralPinned.Contains(cboServiceBusNamespace.Text)
-                    ? "Unpin from top"
-                    : "Pin to top";
-            };
-            cboServiceBusNamespace.ContextMenuStrip = menu;
+                return;
+            }
+            coralPinMenuItem.Text = coralPinned.Contains(cboServiceBusNamespace.Text)
+                ? "Unpin from top"
+                : "Pin to top";
+            coralConnectionMenu.Show(cboServiceBusNamespace, e.Location);
         }
 
         private bool CoralIsSavedConnectionSelected()
