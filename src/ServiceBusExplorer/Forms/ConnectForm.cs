@@ -103,6 +103,11 @@ namespace ServiceBusExplorer.Forms
         private bool ignoreSelectedIndexChange;
         private bool ignoreAuthModeChange;
 
+        // Coral: pinned/recent connection support.
+        private System.Collections.Generic.HashSet<string> coralPinned = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private System.Collections.Generic.HashSet<string> coralRecent = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private System.Windows.Forms.Button btnCoralPin;
+
         #endregion
 
         #region Private Static Fields
@@ -126,10 +131,16 @@ namespace ServiceBusExplorer.Forms
             cboServiceBusNamespace.Items.Add(EnterConnectionString);
             if (serviceBusHelper.ServiceBusNamespaces != null)
             {
+                // Coral: pinned favourites first, then recent, then the rest alphabetically.
+                var coralOrdered = UIHelpers.CoralConnectionList.Order(
+                    serviceBusHelper.ServiceBusNamespaces.Keys, configFileUse);
+                coralPinned = coralOrdered.Pinned;
+                coralRecent = coralOrdered.Recent;
                 // ReSharper disable CoVariantArrayConversion
-                cboServiceBusNamespace.Items.AddRange(serviceBusHelper.ServiceBusNamespaces.Keys.OrderBy(s => s).ToArray());
+                cboServiceBusNamespace.Items.AddRange(coralOrdered.Keys.ToArray());
                 // ReSharper restore CoVariantArrayConversion
             }
+            CoralSetupConnectionList();
 
             ConnectivityMode = ServiceBusHelper.ConnectivityMode;
             cboConnectivityMode.DataSource = Enum.GetValues(typeof(ConnectivityMode));
@@ -271,6 +282,11 @@ namespace ServiceBusExplorer.Forms
             if (cboServiceBusNamespace.Text == EnterConnectionString)
             {
                 connectionString = ConnectionString;
+            }
+            // Coral: remember the chosen saved connection as most-recent.
+            if (CoralIsSavedConnectionSelected())
+            {
+                UIHelpers.CoralConnectionList.RecordRecent(configFileUse, cboServiceBusNamespace.Text);
             }
         }
 
@@ -1073,12 +1089,122 @@ namespace ServiceBusExplorer.Forms
                 if (deleteForm.ShowDialog() == DialogResult.OK)
                 {
                     ConfigurationHelper.RemoveServiceBusNamespace(configFileUse, key, MainForm.StaticWriteToLog);
-                    cboServiceBusNamespace.Items.RemoveAt(cboServiceBusNamespace.SelectedIndex);
-                    cboServiceBusNamespace.SelectedIndex = 0;
-
                     serviceBusHelper.ServiceBusNamespaces.Remove(key);
+                    UIHelpers.CoralConnectionList.Remove(configFileUse, key);
+                    CoralRepopulate(null);
                 }
             }
+        }
+
+        #endregion
+
+        #region Coral pinned/recent connections
+
+        private void CoralSetupConnectionList()
+        {
+            cboServiceBusNamespace.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
+            cboServiceBusNamespace.DrawItem += cboServiceBusNamespace_DrawItem;
+
+            btnCoralPin = new System.Windows.Forms.Button
+            {
+                Name = "btnCoralPin",
+                Text = "Pin",
+                Size = new System.Drawing.Size(72, 23),
+                Location = new System.Drawing.Point(172, 443),
+                FlatStyle = System.Windows.Forms.FlatStyle.Flat,
+                BackColor = System.Drawing.Color.FromArgb(215, 228, 242),
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F),
+                Visible = false
+            };
+            btnCoralPin.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(153, 180, 209);
+            btnCoralPin.Click += btnCoralPin_Click;
+            Controls.Add(btnCoralPin);
+            btnCoralPin.BringToFront();
+
+            cboServiceBusNamespace.SelectedIndexChanged += (s, e) => UpdateCoralPinButton();
+            UpdateCoralPinButton();
+        }
+
+        private bool CoralIsSavedConnectionSelected()
+        {
+            return cboServiceBusNamespace.SelectedIndex > 1 &&
+                   serviceBusHelper.ServiceBusNamespaces != null &&
+                   serviceBusHelper.ServiceBusNamespaces.ContainsKey(cboServiceBusNamespace.Text);
+        }
+
+        private void UpdateCoralPinButton()
+        {
+            if (btnCoralPin == null)
+            {
+                return;
+            }
+            var saved = CoralIsSavedConnectionSelected();
+            btnCoralPin.Visible = saved;
+            btnCoralPin.Text = saved && coralPinned.Contains(cboServiceBusNamespace.Text) ? "Unpin" : "Pin";
+        }
+
+        private void btnCoralPin_Click(object sender, EventArgs e)
+        {
+            if (!CoralIsSavedConnectionSelected())
+            {
+                return;
+            }
+            var key = cboServiceBusNamespace.Text;
+            UIHelpers.CoralConnectionList.TogglePin(configFileUse, key);
+            CoralRepopulate(key);
+        }
+
+        private void CoralRepopulate(string keyToSelect)
+        {
+            ignoreSelectedIndexChange = true;
+            cboServiceBusNamespace.Items.Clear();
+            cboServiceBusNamespace.Items.Add(SelectServiceBusNamespace);
+            cboServiceBusNamespace.Items.Add(EnterConnectionString);
+            var ordered = UIHelpers.CoralConnectionList.Order(serviceBusHelper.ServiceBusNamespaces.Keys, configFileUse);
+            coralPinned = ordered.Pinned;
+            coralRecent = ordered.Recent;
+            // ReSharper disable once CoVariantArrayConversion
+            cboServiceBusNamespace.Items.AddRange(ordered.Keys.ToArray());
+            var index = string.IsNullOrEmpty(keyToSelect) ? 0 : cboServiceBusNamespace.Items.IndexOf(keyToSelect);
+            cboServiceBusNamespace.SelectedIndex = index >= 0 ? index : 0;
+            ignoreSelectedIndexChange = false;
+            cboServiceBusNamespace_SelectedIndexChanged(cboServiceBusNamespace, EventArgs.Empty);
+            UpdateCoralPinButton();
+        }
+
+        private void cboServiceBusNamespace_DrawItem(object sender, System.Windows.Forms.DrawItemEventArgs e)
+        {
+            e.DrawBackground();
+            if (e.Index >= 0)
+            {
+                var key = cboServiceBusNamespace.Items[e.Index].ToString();
+                var textLeft = e.Bounds.X + 3;
+                if (coralPinned.Contains(key))
+                {
+                    var size = 8;
+                    using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Goldenrod))
+                    {
+                        e.Graphics.FillEllipse(brush, e.Bounds.X + 3, e.Bounds.Y + (e.Bounds.Height - size) / 2, size, size);
+                    }
+                    textLeft = e.Bounds.X + 15;
+                }
+                else if (coralRecent.Contains(key))
+                {
+                    var size = 7;
+                    using (var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Gray))
+                    {
+                        e.Graphics.FillEllipse(brush, e.Bounds.X + 4, e.Bounds.Y + (e.Bounds.Height - size) / 2, size, size);
+                    }
+                    textLeft = e.Bounds.X + 15;
+                }
+                using (var brush = new System.Drawing.SolidBrush(e.ForeColor))
+                {
+                    e.Graphics.DrawString(key, e.Font, brush, textLeft,
+                        e.Bounds.Y + (e.Bounds.Height - e.Font.Height) / 2);
+                }
+            }
+            e.DrawFocusRectangle();
         }
 
         #endregion
