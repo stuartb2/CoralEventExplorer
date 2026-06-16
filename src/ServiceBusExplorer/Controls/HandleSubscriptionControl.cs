@@ -380,8 +380,7 @@ namespace ServiceBusExplorer.Controls
                     ReadMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
                     return;
                 }
-                var receiver = CreateMessagesPeekReceiver();
-                var page = PeekPageEndingAt(receiver, count, FindLastSequenceNumber(receiver));
+                var page = PeekNewestPage(CreateMessagesPeekReceiver, count);
                 ShowTailPage(page, replace: true);
             }
             catch (Exception ex)
@@ -433,6 +432,49 @@ namespace ServiceBusExplorer.Controls
             }
         }
 
+        // Returns the newest page of messages. Uses an efficient sequence-number probe
+        // for deep backlogs, and falls back to a forward scan when the probe yields
+        // nothing (e.g. a subscription with a single message, where peeking by sequence
+        // number can come back empty). receiverFactory supplies a fresh peek receiver.
+        List<BrokeredMessage> PeekNewestPage(Func<MessageReceiver> receiverFactory, int count)
+        {
+            var lastSequence = FindLastSequenceNumber(receiverFactory());
+            if (lastSequence != null)
+            {
+                var page = PeekPageEndingAt(receiverFactory(), count, lastSequence);
+                if (page.Count > 0)
+                {
+                    return page;
+                }
+            }
+            return ScanNewest(receiverFactory(), count);
+        }
+
+        // Reliable fallback: peek forward from the front, keeping only the newest
+        // `count` messages. Bounded by the message count, so it is used only when the
+        // probe path returns nothing (typically very small subscriptions).
+        List<BrokeredMessage> ScanNewest(MessageReceiver receiver, int count)
+        {
+            var inspector = CreateDefaultInspector();
+            var window = new List<BrokeredMessage>();
+            while (true)
+            {
+                var batch = receiver.PeekBatch(Math.Max(count, 100))?.ToList();
+                if (batch == null || batch.Count == 0)
+                {
+                    break;
+                }
+                window.AddRange(batch);
+                if (window.Count > count)
+                {
+                    window.RemoveRange(0, window.Count - count);
+                }
+            }
+            return window
+                .Select(m => inspector != null ? inspector.AfterReceiveMessage(m) : m)
+                .ToList();
+        }
+
         static long? PeekSequenceAtOrAfter(MessageReceiver receiver, long fromSequence)
         {
             var messages = receiver.PeekBatch(fromSequence, 1);
@@ -453,7 +495,10 @@ namespace ServiceBusExplorer.Controls
             while (true)
             {
                 var next = PeekSequenceAtOrAfter(receiver, known + step);
-                if (next == null)
+                // Stop when no message exists at/after the probe point. The
+                // "<= known" guard also stops if a peek fails to honour the start
+                // sequence and re-returns an earlier message, preventing a hang.
+                if (next == null || next.Value <= known)
                 {
                     break;
                 }
@@ -469,13 +514,13 @@ namespace ServiceBusExplorer.Controls
             {
                 var mid = lo + (hi - lo) / 2;
                 var found = PeekSequenceAtOrAfter(receiver, mid);
-                if (found == null)
+                if (found != null && found.Value >= mid)
                 {
-                    hi = mid;
+                    lo = found.Value;
                 }
                 else
                 {
-                    lo = found.Value;
+                    hi = mid;
                 }
             }
             return lo;
@@ -590,8 +635,7 @@ namespace ServiceBusExplorer.Controls
                     ReadDeadletterMessagesOneAtTheTime(true, false, count, CreateDefaultInspector(), null);
                     return;
                 }
-                var receiver = CreateDeadletterPeekReceiver();
-                var page = PeekPageEndingAt(receiver, count, FindLastSequenceNumber(receiver));
+                var page = PeekNewestPage(CreateDeadletterPeekReceiver, count);
                 ShowDeadletterTailPage(page, replace: true);
             }
             catch (Exception ex)
