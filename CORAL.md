@@ -22,6 +22,7 @@ Saved connections are shared with stock SBE via the common user settings file
 | Message body | Shown as-is | A **Coral Payload** tab (defaulting to half the view width) decodes the CloudEvents `data_base64` field and shows it as formatted, **foldable** JSON, kept in sync with the selected message |
 | Searching messages | SQL filter expression over properties; date filter | Additionally: a free-text search box that filters the visible messages to those whose body **or decoded payload** contains the text (incremental, case-insensitive, composes with the existing filters) |
 | Searching the payload | n/a | Find box on the Coral Payload tab highlights every match and Enter jumps to the next |
+| Saved connections | Flat alphabetical list | **File → Saved Connections** lists pinned favourites first (gold dot), then recently used (grey dot), then the rest alphabetically; right-click an entry to pin/unpin it |
 | Message inspectors | "Select a BrokeredMessage inspector..." by default | `ZipBrokeredMessageInspector` pre-selected in every send/receive inspector dropdown, so gzip-compressed Coral messages decode transparently |
 | Look and feel | Pale blue Windows theme, Azure-blue logo | Coral web app palette (deep teal chrome, lime/amber accents) applied at runtime; yellow logo; teal tree icons, yellow toolbar icons |
 | Application identity | `ServiceBusExplorer.exe`, "Service Bus Explorer" | `CoralEventExplorer.exe`, "Coral Event Explorer" |
@@ -63,6 +64,16 @@ narrowed to those whose body text *or decoded payload* contains the search text.
 runs on a background thread and each message's searchable text is cached, so refining a
 search is instant. Clearing the box restores the full list. The search stacks with the
 stock SQL-filter and date-range filters.
+
+#### Pinned & recent connections
+The **File → Saved Connections** menu — the usual way to open an existing connection —
+is ordered so the connections you care about are at the top: pinned favourites first
+(marked with a gold dot), then the connections you used most recently (grey dot), then the
+rest alphabetically. Left-click connects as before; **right-click** any entry to pin or
+unpin it. The most-recently-used connection is remembered automatically each time you
+connect. Pinned and recent lists are persisted in the configuration file
+(`coralPinnedConnections` / `coralRecentConnections`), so the order survives restarts. The
+first five entries keep the Ctrl+1…5 shortcuts, so your favourites get them.
 
 ## Configuration
 

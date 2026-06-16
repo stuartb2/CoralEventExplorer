@@ -4,7 +4,7 @@
 #define MyAppName "Coral Event Explorer"
 ; Default version; the github-release workflow overrides it with ISCC /DMyAppVersion=x.y.z
 #ifndef MyAppVersion
-  #define MyAppVersion "1.1.3"
+  #define MyAppVersion "1.1.4"
 #endif
 #define MyAppPublisher "Previse Systems"
 #define MyAppURL "https://github.com/stuartb2/CoralEventExplorer"
