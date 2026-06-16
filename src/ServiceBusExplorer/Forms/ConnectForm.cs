@@ -1105,19 +1105,23 @@ namespace ServiceBusExplorer.Forms
             cboServiceBusNamespace.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
             cboServiceBusNamespace.DrawItem += cboServiceBusNamespace_DrawItem;
 
-            // Position/anchor relative to the Delete button so it scales with DPI and
-            // sits on the same button row regardless of display scaling.
+            // Place the pin toggle next to the namespace dropdown, in the always-visible
+            // top area. The dialog's bottom button row can be clipped off-screen on
+            // high-DPI / short displays, so the top is the reliable home for it.
+            const int pinWidth = 56;
+            cboServiceBusNamespace.DropDownWidth = cboServiceBusNamespace.Width;
+            cboServiceBusNamespace.Width -= (pinWidth + 6);
             btnCoralPin = new System.Windows.Forms.Button
             {
                 Name = "btnCoralPin",
                 Text = "Pin",
-                Size = btnDelete.Size,
-                Location = new System.Drawing.Point(btnDelete.Right + 6, btnDelete.Top),
-                Anchor = btnDelete.Anchor,
+                Size = new System.Drawing.Size(pinWidth, cboServiceBusNamespace.Height),
+                Location = new System.Drawing.Point(cboServiceBusNamespace.Right + 6, cboServiceBusNamespace.Top),
+                Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left,
                 FlatStyle = System.Windows.Forms.FlatStyle.Flat,
                 BackColor = System.Drawing.Color.FromArgb(215, 228, 242),
                 ForeColor = System.Drawing.SystemColors.ControlText,
-                Font = btnDelete.Font,
+                Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F),
                 Visible = false
             };
             btnCoralPin.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(153, 180, 209);
