@@ -17,13 +17,16 @@ Saved connections are shared with stock SBE via the common user settings file
 | Area | Standard SBE | Coral Event Explorer |
 |---|---|---|
 | Entity tree | Namespace root with Queues, Topics, Event Hubs, Notification Hubs and Relays | Topics only, with the Topics list as the tree root |
-| Tree navigation | Expand via +/− glyph | Single click expands; `previsesystems/events` opens automatically after connecting |
+| Tree navigation | Expand via +/− glyph | Single click on a node expands it; the +/− glyph still toggles normally (so you can collapse); `previsesystems/events` opens automatically after connecting |
 | Loading messages | Messages button → receive dialog → peeks from the **front** (oldest) of the entity | Double-click a subscription to load its **newest** 50 messages instantly; Shift+double-click does the same for its **dead-letter queue**; **◀ Older 50** buttons page backwards in chronological order |
 | Message body | Shown as-is | A **Coral Payload** tab (defaulting to half the view width) decodes the CloudEvents `data_base64` field and shows it as formatted, **foldable** JSON, kept in sync with the selected message |
 | Searching messages | SQL filter expression over properties; date filter | Additionally: a free-text search box that filters the visible messages to those whose body **or decoded payload** contains the text (incremental, case-insensitive, composes with the existing filters) |
 | Searching the payload | n/a | Find box on the Coral Payload tab highlights every match and Enter jumps to the next |
 | Saved connections | Flat alphabetical list | **File → Saved Connections** lists pinned favourites first (gold dot), then recently used (grey dot), then the rest alphabetically; right-click an entry to pin/unpin it |
 | Message inspectors | "Select a BrokeredMessage inspector..." by default | `ZipBrokeredMessageInspector` pre-selected in every send/receive inspector dropdown, so gzip-compressed Coral messages decode transparently |
+| Raw message bytes | Body shown only as decoded text / JSON / XML | **Right-click a message → View Raw (Hex)…** opens an offset / hex / ASCII dump, defaulting to the **on-the-wire (compressed)** bytes, with a checkbox to switch to the decompressed body |
+| Update checks | Notifies about new **upstream** Service Bus Explorer releases | Checks **this fork's** GitHub releases (`coral-v*` tags) and links to them, so the prompt matches what you actually run |
+| About box | Standard SBE about | Adds the fork name, author and description, with a clickable link to the Coral repository |
 | Look and feel | Pale blue Windows theme, Azure-blue logo | Coral web app palette (deep teal chrome, lime/amber accents) applied at runtime; yellow logo; teal tree icons, yellow toolbar icons |
 | Application identity | `ServiceBusExplorer.exe`, "Service Bus Explorer" | `CoralEventExplorer.exe`, "Coral Event Explorer" |
 
@@ -75,6 +78,23 @@ connect. Pinned and recent lists are persisted in the configuration file
 (`coralPinnedConnections` / `coralRecentConnections`), so the order survives restarts. The
 first five entries keep the Ctrl+1…5 shortcuts, so your favourites get them.
 
+#### Raw message view (hex)
+Right-clicking a message in any message or dead-letter list adds a **View Raw (Hex)…**
+entry that opens an offset / hex / ASCII dump of the body. Because Coral messages arrive
+gzip-compressed, the view **defaults to the bytes as they came off the wire** (before the
+ZIP inspector decompressed them) so you can see exactly what was transmitted; a **Show
+decompressed body** checkbox switches to the uncompressed body when the two differ. The
+dump reads from a *clone* of the message, so viewing it never consumes the message or
+interferes with resubmitting it. The window title shows which view you are looking at and
+the byte count.
+
+#### Update notifications
+Stock SBE checks the upstream project's GitHub releases, which would always look "out of
+date" against this independently-versioned fork. Coral Event Explorer instead checks
+**this fork's** releases (`coral-v*` tags) and links to them, so the "new version
+available" prompt only appears for a genuinely newer Coral build. See
+[Relationship to upstream](#relationship-to-upstream) for how fork versions are managed.
+
 ## Configuration
 
 These settings live in the `appSettings` section of `CoralEventExplorer.exe.config`:
@@ -110,5 +130,6 @@ To produce the installer, compile `installer\CoralEventExplorer.iss` with
 
 The `main` branch mirrors upstream Service Bus Explorer; all Coral changes live on the
 `coral-event-explorer` branch, deliberately kept small and additive (most features live in
-`src/ServiceBusExplorer/UIHelpers/CoralHelper.cs` and `CoralTheme.cs`) so upstream updates
-merge cleanly. Licensed under the same terms as upstream — see [LICENSE.txt](LICENSE.txt).
+the `src/ServiceBusExplorer/UIHelpers/Coral*.cs` helper files — `CoralHelper`,
+`CoralTheme`, `CoralHexView`, `CoralConnectionList` — with only minimal edits to shared
+forms) so upstream updates merge cleanly. Licensed under the same terms as upstream — see [LICENSE.txt](LICENSE.txt).
