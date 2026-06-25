@@ -12,7 +12,7 @@ including:
 - Topics-only entity tree with the Coral events path auto-expanded
 - Double-click a subscription to load its newest messages (Shift+double-click for its dead-letter queue), with chronological paging back
 - A Coral Payload tab decoding the CloudEvents `data_base64` field as foldable, formatted JSON
-- Free-text search across message bodies and decoded payloads
+- Free-text search across message bodies, with an optional checkbox to also search decoded payloads
 - ZIP message inspector pre-selected everywhere, Coral branding, side-by-side install
 
 ## Installation
