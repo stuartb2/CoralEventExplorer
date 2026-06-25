@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -61,11 +62,15 @@ namespace ServiceBusExplorer.UIHelpers
         }
 
         /// <summary>
-        /// Adds a full-width search strip above a message list grouper. The callback fires
-        /// with the trimmed search text as the user types (debounced) and immediately on
-        /// Enter or when the box is cleared.
+        /// Adds a full-width search strip above a message list grouper. The strip holds the
+        /// search box plus an opt-in "Search payload" checkbox. The callback fires with the
+        /// trimmed search text and the checkbox state as the user types (debounced) and
+        /// immediately on Enter, when the box is cleared, or when the checkbox is toggled.
+        /// The supplied <see cref="CancellationToken"/> is cancelled when a newer search
+        /// supersedes the one in flight, so a long decode can be interrupted.
         /// </summary>
-        internal static TextBox AddBodySearchBox(Controls.Grouper listGrouper, Action<string> applySearch)
+        internal static TextBox AddBodySearchBox(
+            Controls.Grouper listGrouper, Func<string, bool, CancellationToken, Task> applySearch)
         {
             var searchBox = new TextBox
             {
@@ -74,21 +79,55 @@ namespace ServiceBusExplorer.UIHelpers
                 Font = new Font("Microsoft Sans Serif", 8.25F)
             };
             SetCueBanner(searchBox, "Search message text...");
-            var lastApplied = string.Empty;
-            void Apply()
+
+            // Opt-in, off by default: searching the decompressed data_base64 payload
+            // means decoding every message body, so the user asks for it explicitly.
+            var payloadCheckBox = new CheckBox
+            {
+                Name = "coralPayloadSearchCheckBox_" + listGrouper.Name,
+                Text = "Search payload",
+                AutoSize = true,
+                Checked = false,
+                Dock = DockStyle.Right,
+                Padding = new Padding(6, 6, 2, 0),
+                BackColor = Color.Transparent,
+                Font = new Font("Microsoft Sans Serif", 8.25F)
+            };
+            new ToolTip().SetToolTip(payloadCheckBox,
+                "Also search the decompressed data_base64 payload (slower).");
+
+            // Only the most recent search may apply its results; cancelling the previous
+            // token interrupts a decode that is no longer needed.
+            CancellationTokenSource activeSearch = null;
+            var lastText = (string)null;
+            var lastIncludePayload = false;
+            async void Apply()
             {
                 var text = searchBox.Text.Trim();
-                if (text == lastApplied)
+                var includePayload = payloadCheckBox.Checked;
+                if (text == lastText && includePayload == lastIncludePayload)
                 {
                     return;
                 }
-                lastApplied = text;
-                applySearch(text);
+                lastText = text;
+                lastIncludePayload = includePayload;
+
+                activeSearch?.Cancel();
+                activeSearch = new CancellationTokenSource();
+                var token = activeSearch.Token;
+                try
+                {
+                    await applySearch(text, includePayload, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Superseded by a newer search; nothing to apply.
+                }
             }
             // Search incrementally as the user types, debounced so a fast typist
             // does not trigger a match computation per keystroke. Enter applies
             // immediately.
-            var debounceTimer = new Timer { Interval = 300 };
+            var debounceTimer = new System.Windows.Forms.Timer { Interval = 300 };
             debounceTimer.Tick += (s, e) =>
             {
                 debounceTimer.Stop();
@@ -109,7 +148,17 @@ namespace ServiceBusExplorer.UIHelpers
                 debounceTimer.Stop();
                 debounceTimer.Start();
             };
-            searchBox.Disposed += (s, e) => debounceTimer.Dispose();
+            // Toggling the scope re-runs the current search immediately.
+            payloadCheckBox.CheckedChanged += (s, e) =>
+            {
+                debounceTimer.Stop();
+                Apply();
+            };
+            searchBox.Disposed += (s, e) =>
+            {
+                debounceTimer.Dispose();
+                activeSearch?.Cancel();
+            };
 
             var searchPanel = new Panel
             {
@@ -119,66 +168,98 @@ namespace ServiceBusExplorer.UIHelpers
                 Padding = new Padding(0, 0, 0, 6),
                 BackColor = Color.Transparent
             };
+            // Add the Fill control first, then the Right-docked checkbox, so the checkbox
+            // reserves its edge and the search box fills the remainder.
             searchPanel.Controls.Add(searchBox);
+            searchPanel.Controls.Add(payloadCheckBox);
             var parent = listGrouper.Parent;
             parent.Controls.Add(searchPanel);
             listGrouper.BringToFront();
             return searchBox;
         }
 
-        // Decoding a message body (clone, read stream, gunzip, base64-decode the payload)
-        // is too slow to repeat for every message on every keystroke, so the searchable
-        // text is computed once per message and kept for the message's lifetime.
-        static readonly ConditionalWeakTable<BrokeredMessage, string> searchTextCache =
-            new ConditionalWeakTable<BrokeredMessage, string>();
-
-        static string BuildSearchText(ServiceBusHelper serviceBusHelper, BrokeredMessage message)
+        // Decoding a message body (clone, read stream, gunzip) and extracting its
+        // data_base64 payload (parse JSON, base64-decode) is too slow to repeat for every
+        // message on every keystroke, so each is computed once per message and kept for the
+        // message's lifetime. The payload is decoded lazily: when "Search payload" is off
+        // (the default) it is never computed.
+        sealed class CachedSearchText
         {
-            string body;
+            public string Body;
+            public bool PayloadDecoded;
+            public string Payload; // decoded data_base64 payload, or null if absent
+        }
+
+        static readonly ConditionalWeakTable<BrokeredMessage, CachedSearchText> searchTextCache =
+            new ConditionalWeakTable<BrokeredMessage, CachedSearchText>();
+
+        static string BuildBodyText(ServiceBusHelper serviceBusHelper, BrokeredMessage message)
+        {
             try
             {
-                body = serviceBusHelper.GetMessageText(message, MainForm.SingletonMainForm.UseAscii, out _);
+                return serviceBusHelper.GetMessageText(message, MainForm.SingletonMainForm.UseAscii, out _)
+                    ?? string.Empty;
             }
             catch (Exception)
             {
                 return string.Empty;
             }
-            if (body == null)
-            {
-                return string.Empty;
-            }
-            var payload = TryExtractPayload(body);
-            return payload == null ? body : body + "\n" + payload;
         }
 
         /// <summary>
-        /// Returns true when the message body text, or its decoded data_base64 payload,
-        /// contains the search text (case-insensitive).
+        /// Returns true when the message body text contains the search text
+        /// (case-insensitive). When <paramref name="includePayload"/> is set, the decoded
+        /// data_base64 payload is searched as well.
         /// </summary>
-        internal static bool MessageMatches(ServiceBusHelper serviceBusHelper, BrokeredMessage message, string searchText)
+        internal static bool MessageMatches(
+            ServiceBusHelper serviceBusHelper, BrokeredMessage message, string searchText, bool includePayload)
         {
             if (string.IsNullOrWhiteSpace(searchText))
             {
                 return true;
             }
-            var text = searchTextCache.GetValue(message, m => BuildSearchText(serviceBusHelper, m));
-            return text.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+            var entry = searchTextCache.GetValue(
+                message, m => new CachedSearchText { Body = BuildBodyText(serviceBusHelper, m) });
+            if (entry.Body.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+            if (!includePayload)
+            {
+                return false;
+            }
+            if (!entry.PayloadDecoded)
+            {
+                // A parallel search may decode the same message twice; the result is
+                // identical, so the race is harmless and needs no lock.
+                entry.Payload = TryExtractPayload(entry.Body);
+                entry.PayloadDecoded = true;
+            }
+            return entry.Payload != null
+                && entry.Payload.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
         /// Computes the set of messages matching the search text on a background thread,
-        /// so the UI stays responsive while bodies are decoded. Returns null when the
-        /// search text is empty (meaning: no filtering).
+        /// so the UI stays responsive while bodies are decoded. When
+        /// <paramref name="includePayload"/> is set, the decoded data_base64 payload is
+        /// searched too. The work observes <paramref name="cancellationToken"/> and throws
+        /// <see cref="OperationCanceledException"/> if a newer search supersedes it. Returns
+        /// null when the search text is empty (meaning: no filtering).
         /// </summary>
         internal static Task<HashSet<BrokeredMessage>> ComputeMatchesAsync(
-            ServiceBusHelper serviceBusHelper, List<BrokeredMessage> messages, string searchText)
+            ServiceBusHelper serviceBusHelper, List<BrokeredMessage> messages, string searchText,
+            bool includePayload, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(searchText))
             {
                 return Task.FromResult<HashSet<BrokeredMessage>>(null);
             }
             return Task.Run(() => new HashSet<BrokeredMessage>(
-                messages.AsParallel().Where(m => MessageMatches(serviceBusHelper, m, searchText))));
+                messages.AsParallel()
+                    .WithCancellation(cancellationToken)
+                    .Where(m => MessageMatches(serviceBusHelper, m, searchText, includePayload))),
+                cancellationToken);
         }
 
         /// <summary>
@@ -359,7 +440,7 @@ namespace ServiceBusExplorer.UIHelpers
             // clears immediately, and the payload of the row the user settles on is
             // decoded on a background thread and displayed shortly after.
             var pendingBody = string.Empty;
-            var payloadDebounceTimer = new Timer { Interval = 200 };
+            var payloadDebounceTimer = new System.Windows.Forms.Timer { Interval = 200 };
             payloadDebounceTimer.Tick += async (s, e) =>
             {
                 payloadDebounceTimer.Stop();

@@ -326,7 +326,7 @@ namespace ServiceBusExplorer.Controls
 
             CoralHexView.AttachHexViewMenuItem(messagesContextMenuStrip, () => brokeredMessage);
 
-            CoralHelper.AddBodySearchBox(grouperMessageList, async text =>
+            CoralHelper.AddBodySearchBox(grouperMessageList, async (text, includePayload, token) =>
             {
                 try
                 {
@@ -338,7 +338,7 @@ namespace ServiceBusExplorer.Controls
                     UseWaitCursor = true;
                     try
                     {
-                        messagesBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, messageBindingList.ToList(), text);
+                        messagesBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, messageBindingList.ToList(), text, includePayload, token);
                     }
                     finally
                     {
@@ -350,12 +350,16 @@ namespace ServiceBusExplorer.Controls
                     }
                     FilterMessages();
                 }
+                catch (OperationCanceledException)
+                {
+                    // Superseded by a newer search; nothing to apply.
+                }
                 catch (Exception ex)
                 {
                     HandleException(ex);
                 }
             });
-            CoralHelper.AddBodySearchBox(grouperDeadletterList, async text =>
+            CoralHelper.AddBodySearchBox(grouperDeadletterList, async (text, includePayload, token) =>
             {
                 try
                 {
@@ -367,7 +371,7 @@ namespace ServiceBusExplorer.Controls
                     UseWaitCursor = true;
                     try
                     {
-                        deadletterBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, deadletterBindingList.ToList(), text);
+                        deadletterBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, deadletterBindingList.ToList(), text, includePayload, token);
                     }
                     finally
                     {
@@ -379,12 +383,16 @@ namespace ServiceBusExplorer.Controls
                     }
                     FilterDeadletters();
                 }
+                catch (OperationCanceledException)
+                {
+                    // Superseded by a newer search; nothing to apply.
+                }
                 catch (Exception ex)
                 {
                     HandleException(ex);
                 }
             });
-            CoralHelper.AddBodySearchBox(grouperTransferDeadletterList, async text =>
+            CoralHelper.AddBodySearchBox(grouperTransferDeadletterList, async (text, includePayload, token) =>
             {
                 try
                 {
@@ -396,7 +404,7 @@ namespace ServiceBusExplorer.Controls
                     UseWaitCursor = true;
                     try
                     {
-                        transferDeadletterBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, transferDeadletterBindingList.ToList(), text);
+                        transferDeadletterBodySearchMatches = await CoralHelper.ComputeMatchesAsync(serviceBusHelper, transferDeadletterBindingList.ToList(), text, includePayload, token);
                     }
                     finally
                     {
@@ -407,6 +415,10 @@ namespace ServiceBusExplorer.Controls
                         return; // superseded by a newer search
                     }
                     FilterTransferDeadletters();
+                }
+                catch (OperationCanceledException)
+                {
+                    // Superseded by a newer search; nothing to apply.
                 }
                 catch (Exception ex)
                 {
