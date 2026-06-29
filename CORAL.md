@@ -19,7 +19,7 @@ Saved connections are shared with stock SBE via the common user settings file
 | Entity tree | Namespace root with Queues, Topics, Event Hubs, Notification Hubs and Relays | Topics only, with the Topics list as the tree root |
 | Tree navigation | Expand via +/− glyph | Single click on a node expands it; the +/− glyph still toggles normally (so you can collapse); `previsesystems/events` opens automatically after connecting |
 | Loading messages | Messages button → receive dialog → peeks from the **front** (oldest) of the entity | Double-click a subscription to load its **newest** 50 messages instantly; Shift+double-click does the same for its **dead-letter queue**; **◀ Older 50** buttons page backwards in chronological order |
-| Message body | Shown as-is | A **Coral Payload** tab (defaulting to half the view width) decodes the CloudEvents `data_base64` field and shows it as formatted, **foldable** JSON, kept in sync with the selected message |
+| Message body | Shown as-is | A **Coral Payload** tab (defaulting to half the view width) decodes the CloudEvents `data_base64` field and shows it as formatted, **foldable** JSON, kept in sync with the selected message; an embedded-JSON string field (by default `customdata`) is inlined as a nested node rather than an escaped blob |
 | Searching messages | SQL filter expression over properties; date filter | Additionally: a free-text search box that filters the visible messages to those whose body contains the text, with an optional **Search payload** checkbox that extends the search to the decoded `data_base64` payload (incremental, case-insensitive, composes with the existing filters) |
 | Searching the payload | n/a | Find box on the Coral Payload tab highlights every match and Enter jumps to the next |
 | Saved connections | Flat alphabetical list | **File → Saved Connections** lists pinned favourites first (gold dot), then recently used (grey dot), then the rest alphabetically; right-click an entry to pin/unpin it |
@@ -59,6 +59,13 @@ body and pretty-prints it as JSON with syntax highlighting; objects and arrays a
 own Copy Body button and a find-with-highlight box. Rendering is debounced and runs off
 the UI thread, so scrolling quickly through the message list stays fluid. Messages without
 a `data_base64` field simply show an empty payload panel.
+
+If the decoded payload contains a field holding an *embedded* JSON document as a string
+(by default one named `customdata`), that string is parsed and shown as a nested node — the
+field becomes a parent with the embedded values as foldable sub-fields — instead of an
+escaped one-line blob. This applies wherever the field appears (including nested), and is
+left untouched if its value is not valid JSON. The field name is configurable via
+`inlineEmbeddedJsonField`; blank disables the behaviour.
 
 #### Body search
 Every message list (messages and dead-letter views of queues and subscriptions) has a
@@ -108,6 +115,7 @@ These settings live in the `appSettings` section of `CoralEventExplorer.exe.conf
 | `topicsOnlyTree` | `true` | Set `false` to restore the full stock entity tree |
 | `defaultExpandTopicPath` | `previsesystems/events` | Topic path (or name prefix) opened automatically after the tree loads; empty disables |
 | `doubleClickPeekMessageCount` | `50` | Page size for the double-click peek and the Older button |
+| `inlineEmbeddedJsonField` | `customdata` | Payload field whose embedded-JSON string value is inlined as a nested node on the Coral Payload tab; blank disables |
 
 Tip: in *Options → config file*, choose the **user config** so connections you save from
 the UI persist in `%APPDATA%\Service Bus Explorer\UserSettings.config` and survive

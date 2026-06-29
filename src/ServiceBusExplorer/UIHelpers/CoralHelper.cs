@@ -44,6 +44,18 @@ namespace ServiceBusExplorer.UIHelpers
         const string PayloadFieldName = "data_base64";
         const string PayloadPanelTitle = "Coral Payload (data_base64)";
 
+        // Name of a payload field whose value is itself an embedded JSON string (e.g.
+        // "customdata"). When the decoded payload is displayed, such a field is parsed and
+        // shown as a nested node in the tree instead of an escaped one-line blob.
+        // Configurable via inlineEmbeddedJsonField; blank disables the feature.
+        static readonly string EmbeddedJsonFieldName = GetEmbeddedJsonFieldName();
+
+        static string GetEmbeddedJsonFieldName()
+        {
+            var configured = System.Configuration.ConfigurationManager.AppSettings["inlineEmbeddedJsonField"];
+            return configured ?? "customdata";
+        }
+
         const int EM_SETCUEBANNER = 0x1501;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -486,9 +498,100 @@ namespace ServiceBusExplorer.UIHelpers
             }
             if (JsonSerializerHelper.IsJson(payload))
             {
-                return (JsonSerializerHelper.Indent(payload), true);
+                return (FormatPayloadJson(payload), true);
             }
             return (payload, false);
+        }
+
+        // Indents the decoded payload JSON for display, first inlining any embedded-JSON
+        // string field (see EmbeddedJsonFieldName) so it becomes part of the tree. Falls
+        // back to the stock indenter if anything about the payload is unexpected.
+        static string FormatPayloadJson(string payloadJson)
+        {
+            if (string.IsNullOrWhiteSpace(EmbeddedJsonFieldName))
+            {
+                return JsonSerializerHelper.Indent(payloadJson);
+            }
+            try
+            {
+                var root = ParseJsonPreservingDates(payloadJson);
+                InlineEmbeddedJson(root);
+                return root.ToString(Newtonsoft.Json.Formatting.Indented);
+            }
+            catch (Exception)
+            {
+                return JsonSerializerHelper.Indent(payloadJson);
+            }
+        }
+
+        // Recursively replaces any string property named EmbeddedJsonFieldName whose value
+        // is itself a JSON object or array with the parsed JSON, so the embedded document
+        // appears as a nested node (the field as a parent, its values as sub-fields)
+        // instead of an escaped one-line string.
+        static void InlineEmbeddedJson(JToken token)
+        {
+            if (token is JObject obj)
+            {
+                foreach (var property in obj.Properties())
+                {
+                    if (string.Equals(property.Name, EmbeddedJsonFieldName, StringComparison.OrdinalIgnoreCase)
+                        && property.Value.Type == JTokenType.String)
+                    {
+                        var embedded = TryParseEmbeddedJson((string)property.Value);
+                        if (embedded != null)
+                        {
+                            InlineEmbeddedJson(embedded);
+                            property.Value = embedded;
+                            continue;
+                        }
+                    }
+                    InlineEmbeddedJson(property.Value);
+                }
+            }
+            else if (token is JArray array)
+            {
+                foreach (var item in array)
+                {
+                    InlineEmbeddedJson(item);
+                }
+            }
+        }
+
+        // Parses a string as JSON only when it looks like an embedded object or array,
+        // leaving plain scalar strings untouched. Returns null when it is not parseable.
+        static JToken TryParseEmbeddedJson(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+            var trimmed = value.TrimStart();
+            if (trimmed.Length == 0 || (trimmed[0] != '{' && trimmed[0] != '['))
+            {
+                return null;
+            }
+            try
+            {
+                return ParseJsonPreservingDates(value);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        // Parses JSON without Json.NET's default coercion of ISO-8601 strings into dates,
+        // matching how the stock indenter preserves the original text.
+        static JToken ParseJsonPreservingDates(string json)
+        {
+            using (var stringReader = new System.IO.StringReader(json))
+            using (var jsonReader = new Newtonsoft.Json.JsonTextReader(stringReader)
+            {
+                DateParseHandling = Newtonsoft.Json.DateParseHandling.None
+            })
+            {
+                return JToken.ReadFrom(jsonReader);
+            }
         }
 
         static void ApplyPayload(FastColoredTextBox payloadTextBox, string payloadText, bool isJson)
