@@ -244,11 +244,25 @@ namespace ServiceBusExplorer.UIHelpers
             {
                 // A parallel search may decode the same message twice; the result is
                 // identical, so the race is harmless and needs no lock.
-                entry.Payload = TryExtractPayload(entry.Body);
+                entry.Payload = BuildSearchablePayload(entry.Body);
                 entry.PayloadDecoded = true;
             }
             return entry.Payload != null
                 && entry.Payload.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        // Builds the payload text used for searching. It is normalized the same way the
+        // Coral Payload tab displays it — pretty-printed with embedded-JSON fields (e.g.
+        // customdata) inlined — so a payload search matches what the user actually sees,
+        // rather than the raw escaped data_base64 string.
+        static string BuildSearchablePayload(string body)
+        {
+            var payload = TryExtractPayload(body);
+            if (payload == null)
+            {
+                return null;
+            }
+            return JsonSerializerHelper.IsJson(payload) ? FormatPayloadJson(payload) : payload;
         }
 
         /// <summary>

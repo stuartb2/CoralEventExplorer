@@ -73,7 +73,9 @@ search strip above the grid. Type to filter — after a short pause the visible 
 narrowed to those whose body text contains the search text. A **Search payload** checkbox
 (off by default) extends each search to the message's decompressed `data_base64` payload;
 because that means decoding every body, it is opt-in, and payloads are decoded only when
-the box is ticked. Matching runs on a background thread and each message's searchable text
+the box is ticked. The payload is searched in the same normalized form the Coral Payload
+tab shows — pretty-printed with embedded-JSON fields (e.g. `customdata`) inlined — so a
+match lines up with what you see rather than the raw escaped string. Matching runs on a background thread and each message's searchable text
 is cached, so refining a search is instant. Searches are interruptable — typing again,
 pressing Enter, or toggling the checkbox cancels any search still in flight — so a long
 decode never blocks the next search. Clearing the box restores the full list. The search
