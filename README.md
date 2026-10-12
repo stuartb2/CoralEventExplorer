@@ -23,7 +23,7 @@ or the portable zip. Requires .NET Framework 4.7.2.
 
 ## Building
 
-Open `src\ServiceBusExplorer.sln`, or run
+Open `src\ServiceBusExplorer.slnx`, or run
 `dotnet build src\ServiceBusExplorer\ServiceBusExplorer.csproj -c Release`.
 The installer is built from `installer\CoralEventExplorer.iss` with
 [Inno Setup](https://jrsoftware.org/isinfo.php).

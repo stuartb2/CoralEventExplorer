@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Restore NuGet packages
-        run: dotnet restore src/ServiceBusExplorer.sln
+        run: dotnet restore src/ServiceBusExplorer/ServiceBusExplorer.csproj
 
       - name: Build Release
         run: >-

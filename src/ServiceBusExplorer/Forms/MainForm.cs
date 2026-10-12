@@ -25,6 +25,9 @@ using Azure.ResourceManager.EventGrid;
 using EventGridExplorerLibrary;
 using Microsoft.Azure.NotificationHubs;
 using Microsoft.ServiceBus.Messaging;
+
+using ServiceBusExplorer.Common.Entities;
+using ServiceBusExplorer.Common.Helpers;
 using ServiceBusExplorer.Controls;
 using ServiceBusExplorer.Enums;
 using ServiceBusExplorer.Helpers;
@@ -495,6 +498,11 @@ namespace ServiceBusExplorer.Forms
 
         void DisplayNewVersionInformation()
         {
+#if DEBUG
+            linkLabelNewVersionAvailable.Visible = true;
+            linkLabelNewVersionAvailable.Enabled = false;
+            linkLabelNewVersionAvailable.Text = $"Debug Version";
+#else
             if (!VersionProvider.IsLatestVersion(out var releaseInfo, WriteToLog))
             {
                 linkLabelNewVersionAvailable.Visible = true;
@@ -504,6 +512,7 @@ namespace ServiceBusExplorer.Forms
             {
                 linkLabelNewVersionAvailable.Visible = false;
             }
+#endif
         }
 
         private void UpdateSavedConnectionsMenu()
@@ -622,7 +631,7 @@ namespace ServiceBusExplorer.Forms
             argumentName = argument;
             argumentValue = value;
         }
-        #endregion
+#endregion
 
         #region Event Handlers
         private void duplicateSubscriptionMenuItem_Click(object sender, EventArgs e)
@@ -643,7 +652,7 @@ namespace ServiceBusExplorer.Forms
         {
             try
             {
-                using (var connectForm = new ConnectForm(serviceBusHelper, configFileUse))
+                using (var connectForm = new ConnectForm(serviceBusHelper, configFileUse, this.EntraTenantIds))
                 {
                     if (connectForm.ShowDialog() != DialogResult.OK)
                     {
@@ -654,9 +663,11 @@ namespace ServiceBusExplorer.Forms
                     SelectedEntities = connectForm.SelectedEntities;
                     ServiceBusHelper.ConnectivityMode = connectForm.ConnectivityMode;
                     ServiceBusHelper.UseAmqpWebSockets = connectForm.UseAmqpWebSockets;
+
                     var serviceBusNamespace = connectForm.ServiceBusNamespaceInstance
                         ?? ServiceBusNamespace.GetServiceBusNamespace(connectForm.Key ?? "Manual",
                             connectForm.ConnectionString, StaticWriteToLog);
+                    
                     serviceBusHelper.Connect(serviceBusNamespace);
 
                     SetTitle(serviceBusNamespace.Namespace, "Service Bus");
@@ -770,6 +781,8 @@ namespace ServiceBusExplorer.Forms
                 ProxyUserName = ProxyUserName,
                 ProxyPassword = ProxyPassword,
 
+                EntraTenantIds = EntraTenantIds,
+
                 NodesColors = NodesColors
             };
 
@@ -846,6 +859,8 @@ namespace ServiceBusExplorer.Forms
                 ServiceBusHelper.EncodingType = optionForm.MainSettings.EncodingType;
 
                 SetProxy(optionForm.MainSettings);
+
+                EntraTenantIds = optionForm.MainSettings.EntraTenantIds;
 
                 NodesColors = optionForm.MainSettings.NodesColors;
             }
@@ -4305,6 +4320,7 @@ namespace ServiceBusExplorer.Forms
                 ProxyUseDefaultCredentials = ProxyUseDefaultCredentials,
                 ProxyUserName = ProxyUserName,
                 ProxyPassword = ProxyPassword,
+                EntraTenantIds = EntraTenantIds,
                 NodesColors = NodesColors
             };
 
@@ -4421,6 +4437,7 @@ namespace ServiceBusExplorer.Forms
 
             SetProxy(readSettings);
 
+            EntraTenantIds = readSettings.EntraTenantIds;
             NodesColors = readSettings.NodesColors;
         }
 
@@ -4620,6 +4637,8 @@ namespace ServiceBusExplorer.Forms
         public string NamespaceHostname { get; set; }
         public List<Dictionary<string, List<string>>> Filters { get; set; }
 
+        public List<EntraTenantIdItem> EntraTenantIds { get; set; } = new List<EntraTenantIdItem>();
+
         public List<NodeColorInfo> NodesColors { get; set; } = new List<NodeColorInfo>();
 
         public BodyType MessageBodyType
@@ -4721,12 +4740,12 @@ namespace ServiceBusExplorer.Forms
                     var eventHubListNode = FindNode(Constants.EventHubEntities, rootNode);
                     var notificationHubListNode = FindNode(Constants.NotificationHubEntities, rootNode);
                     var relayServiceListNode = FindNode(Constants.RelayEntities, rootNode);
-                    var isAad = serviceBusHelper.IsAzureActiveDirectory;
+                    var isEntra = serviceBusHelper.IsEntra;
                     var loadQueues = !serviceBusHelper.IsEventHubNamespace && SelectedEntities.Contains(Constants.QueueEntities);
                     var loadTopics = !serviceBusHelper.IsEventHubNamespace && SelectedEntities.Contains(Constants.TopicEntities);
-                    var loadEventHubs = SelectedEntities.Contains(Constants.EventHubEntities) && (!isAad || serviceBusHelper.IsEventHubNamespace);
-                    var loadNotificationHubs = !isAad && SelectedEntities.Contains(Constants.NotificationHubEntities);
-                    var loadRelays = !isAad && SelectedEntities.Contains(Constants.RelayEntities);
+                    var loadEventHubs = SelectedEntities.Contains(Constants.EventHubEntities) && (!isEntra || serviceBusHelper.IsEventHubNamespace);
+                    var loadNotificationHubs = !isEntra && SelectedEntities.Contains(Constants.NotificationHubEntities);
+                    var loadRelays = !isEntra && SelectedEntities.Contains(Constants.RelayEntities);
                     if (TopicsOnlyTree && !serviceBusHelper.IsEventHubNamespace)
                     {
                         // Coral simplified tree: the Topics list is the tree root, with
@@ -7931,11 +7950,22 @@ namespace ServiceBusExplorer.Forms
         {
             if (keyData == (Keys.Control | Keys.F))
             {
+                if (GetFocusedControl(this) is FastColoredTextBoxNS.FastColoredTextBox)
+                {
+                    return base.ProcessCmdKey(ref msg, keyData);
+                }
                 filterTreeViewTextBox.Focus();
                 filterTreeViewTextBox.SelectAll();
                 return true;
             }
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private static Control GetFocusedControl(Control control)
+        {
+            if (control is ContainerControl cc && cc.ActiveControl != null)
+                return GetFocusedControl(cc.ActiveControl);
+            return control;
         }
 
         #endregion
@@ -7982,5 +8012,20 @@ namespace ServiceBusExplorer.Forms
         }
 
         #endregion
+
+        private void logOutFromEntraToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Log out from Entra ID
+            try
+            {
+                serviceBusHelper.LogOutFromEntra();
+                WriteToLog("Cleared cached Entra credentials for this app. You will need to sign in again next time you connect. "
+                    + "This does not sign you out of Entra in your browser, so a new sign-in may still pick the same account automatically.");
+            }
+            catch (Exception ex)
+            {
+                HandleException(ex);
+            }
+        }
     }
 }

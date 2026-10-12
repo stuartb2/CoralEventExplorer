@@ -136,7 +136,7 @@ Requires .NET Framework 4.7.2 (preinstalled on current Windows 10/11).
 
 ## Building
 
-Open `src\ServiceBusExplorer.sln` (or `dotnet build src\ServiceBusExplorer\ServiceBusExplorer.csproj -c Release`).
+Open `src\ServiceBusExplorer.slnx` (or `dotnet build src\ServiceBusExplorer\ServiceBusExplorer.csproj -c Release`).
 To produce the installer, compile `installer\CoralEventExplorer.iss` with
 [Inno Setup](https://jrsoftware.org/isinfo.php) after a Release build.
 
